@@ -2,6 +2,7 @@ import { Task, Priority } from "@/types";
 import { Check, Pencil, Trash2, Clock, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, parseISO } from "date-fns";
+import { nl } from "date-fns/locale";
 import { TaskForm } from "./TaskForm";
 
 interface TaskCardProps {
