@@ -5,6 +5,7 @@ import { TimelineBlock } from "@/components/TimelineBlock";
 import { Button } from "@/components/ui/button";
 import { Wand2, CalendarDays } from "lucide-react";
 import { format, parseISO } from "date-fns";
+import { nl } from "date-fns/locale";
 import { toast } from "sonner";
 
 const Planner = () => {
@@ -16,12 +17,12 @@ const Planner = () => {
   const handleGenerate = () => {
     const incompleteTasks = tasks.filter((t) => !t.completed);
     if (incompleteTasks.length === 0) {
-      toast.error("No incomplete tasks to plan!");
+      toast.error("Geen openstaande taken om in te plannen!");
       return;
     }
     const blocks = generatePlan(tasks, activities, schedule);
     setPlanBlocks(blocks);
-    toast.success(`Plan generated with ${blocks.length} blocks!`);
+    toast.success(`Plan gegenereerd met ${blocks.length} blokken!`);
   };
 
   const toggleBlock = (id: string) => {
@@ -45,7 +46,7 @@ const Planner = () => {
         <h1 className="font-display text-2xl font-bold">Planner</h1>
         <Button onClick={handleGenerate} className="gap-2">
           <Wand2 size={16} />
-          Generate Plan
+          Plan genereren
         </Button>
       </div>
 
@@ -55,7 +56,7 @@ const Planner = () => {
             <div key={date}>
               <h2 className="mb-2 flex items-center gap-2 font-display text-sm font-semibold text-muted-foreground">
                 <CalendarDays size={14} />
-                {format(parseISO(date), "EEEE, MMM d")}
+                {format(parseISO(date), "EEEE d MMMM", { locale: nl })}
               </h2>
               <div className="flex flex-col gap-2">
                 {blocksByDate[date].map((block) => (
@@ -68,9 +69,9 @@ const Planner = () => {
       ) : (
         <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed bg-card/50 py-16 text-center">
           <Wand2 size={40} className="mb-3 text-primary/40" />
-          <h3 className="font-display text-lg font-semibold">Ready to plan</h3>
+          <h3 className="font-display text-lg font-semibold">Klaar om te plannen</h3>
           <p className="mt-1 max-w-xs text-sm text-muted-foreground">
-            Click "Generate Plan" to automatically schedule your homework into available time slots.
+            Klik op "Plan genereren" om je huiswerk automatisch in te plannen in de beschikbare tijdsloten.
           </p>
         </div>
       )}

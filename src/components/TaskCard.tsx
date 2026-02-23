@@ -49,7 +49,7 @@ export function TaskCard({ task, onToggle, onDelete, onEdit }: TaskCardProps) {
           </span>
           <span className="flex items-center gap-1">
             <Calendar size={12} />
-            {format(parseISO(task.dueDate), "MMM d")}
+            {format(parseISO(task.dueDate), "d MMM", { locale: nl })}
           </span>
         </div>
       </div>

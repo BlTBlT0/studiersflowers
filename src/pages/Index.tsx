@@ -1,4 +1,5 @@
 import { format } from "date-fns";
+import { nl } from "date-fns/locale";
 import { PlanBlock, Task, Activity, ScheduleSettings, DEFAULT_SCHEDULE } from "@/types";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { getTodayBlocks, getAvailableMinutes } from "@/lib/planner";
@@ -26,8 +27,8 @@ const Index = () => {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="font-display text-2xl font-bold">Today's Plan</h1>
-        <p className="text-sm text-muted-foreground">{format(new Date(), "EEEE, MMMM d")}</p>
+        <h1 className="font-display text-2xl font-bold">Plan van Vandaag</h1>
+        <p className="text-sm text-muted-foreground">{format(new Date(), "EEEE d MMMM", { locale: nl })}</p>
       </div>
 
       {/* Stats */}
@@ -35,16 +36,16 @@ const Index = () => {
         <div className="rounded-xl border bg-card p-4">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Clock size={16} />
-            <span className="text-xs font-medium">Available</span>
+            <span className="text-xs font-medium">Beschikbaar</span>
           </div>
           <p className="mt-1 font-display text-2xl font-bold">
-            {Math.floor(availableMinutes / 60)}h {availableMinutes % 60}m
+            {Math.floor(availableMinutes / 60)}u {availableMinutes % 60}m
           </p>
         </div>
         <div className="rounded-xl border bg-card p-4">
           <div className="flex items-center gap-2 text-muted-foreground">
             <CheckCircle2 size={16} />
-            <span className="text-xs font-medium">Progress</span>
+            <span className="text-xs font-medium">Voortgang</span>
           </div>
           <p className="mt-1 font-display text-2xl font-bold">
             {completedBlocks}/{totalBlocks}
@@ -53,7 +54,7 @@ const Index = () => {
         <div className="col-span-2 rounded-xl border bg-card p-4 sm:col-span-1">
           <div className="flex items-center gap-2 text-muted-foreground">
             <BookOpen size={16} />
-            <span className="text-xs font-medium">Pending Tasks</span>
+            <span className="text-xs font-medium">Openstaande Taken</span>
           </div>
           <p className="mt-1 font-display text-2xl font-bold">{incompleteTasks}</p>
         </div>
@@ -69,9 +70,9 @@ const Index = () => {
       ) : (
         <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed bg-card/50 py-16 text-center">
           <Sparkles size={40} className="mb-3 text-primary/40" />
-          <h3 className="font-display text-lg font-semibold">No plan generated yet</h3>
+          <h3 className="font-display text-lg font-semibold">Nog geen plan gegenereerd</h3>
           <p className="mt-1 max-w-xs text-sm text-muted-foreground">
-            Add homework tasks, set your schedule, then head to the Planner to generate today's study plan.
+            Voeg huiswerk toe, stel je rooster in en ga naar de Planner om je studieplan te genereren.
           </p>
         </div>
       )}

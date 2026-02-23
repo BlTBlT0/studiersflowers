@@ -61,15 +61,17 @@ export const DEFAULT_SCHEDULE: ScheduleSettings = {
 };
 
 export const SUBJECTS = [
-  "Math",
-  "Science",
-  "English",
-  "History",
-  "Geography",
-  "Art",
-  "Music",
-  "PE",
-  "Computer Science",
-  "Foreign Language",
-  "Other",
+  "Kunst",
+  "Biologie",
+  "Aardrijkskunde",
+  "Wiskunde",
+  "Geschiedenis",
+  "Lichamelijke Opvoeding",
+  "Engels",
+  "Nederlands",
+  "Grieks",
+  "Wetenschap",
+  "Muziek",
+  "Frans",
+  "VVV",
 ];
