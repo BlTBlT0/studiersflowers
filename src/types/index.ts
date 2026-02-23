@@ -3,11 +3,11 @@ export type Weekday = "monday" | "tuesday" | "wednesday" | "thursday" | "friday"
 
 export const WEEKDAYS: Weekday[] = ["monday", "tuesday", "wednesday", "thursday", "friday"];
 export const WEEKDAY_LABELS: Record<Weekday, string> = {
-  monday: "Mon",
-  tuesday: "Tue",
-  wednesday: "Wed",
-  thursday: "Thu",
-  friday: "Fri",
+  monday: "Ma",
+  tuesday: "Di",
+  wednesday: "Wo",
+  thursday: "Do",
+  friday: "Vr",
 };
 
 export interface Task {
