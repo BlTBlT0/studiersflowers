@@ -57,6 +57,7 @@ export const DEFAULT_SCHEDULE: ScheduleSettings = {
     friday: "15:30",
   },
   bedtime: "21:30",
+  commuteMinutes: 15,
 };
 
 export const SUBJECTS = [
