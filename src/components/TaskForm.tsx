@@ -13,6 +13,12 @@ interface TaskFormProps {
   trigger?: React.ReactNode;
 }
 
+const PRIORITY_LABELS: Record<Priority, string> = {
+  low: "laag",
+  medium: "gemiddeld",
+  high: "hoog",
+};
+
 export function TaskForm({ onSave, initial, trigger }: TaskFormProps) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState(initial?.title || "");
@@ -41,23 +47,23 @@ export function TaskForm({ onSave, initial, trigger }: TaskFormProps) {
         {trigger || (
           <Button className="gap-2">
             <Plus size={16} />
-            Add Task
+            Taak toevoegen
           </Button>
         )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{initial ? "Edit Task" : "New Homework Task"}</DialogTitle>
+          <DialogTitle>{initial ? "Taak bewerken" : "Nieuwe huiswerktaak"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div>
-            <Label htmlFor="title">Title</Label>
-            <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Read Chapter 5..." required />
+            <Label htmlFor="title">Titel</Label>
+            <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Hoofdstuk 5 lezen..." required />
           </div>
           <div>
-            <Label htmlFor="subject">Subject</Label>
+            <Label htmlFor="subject">Vak</Label>
             <Select value={subject} onValueChange={setSubject}>
-              <SelectTrigger><SelectValue placeholder="Select subject" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Kies een vak" /></SelectTrigger>
               <SelectContent>
                 {SUBJECTS.map((s) => (
                   <SelectItem key={s} value={s}>{s}</SelectItem>
@@ -67,16 +73,16 @@ export function TaskForm({ onSave, initial, trigger }: TaskFormProps) {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label htmlFor="dueDate">Due Date</Label>
+              <Label htmlFor="dueDate">Deadline</Label>
               <Input id="dueDate" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} required />
             </div>
             <div>
-              <Label htmlFor="minutes">Est. Minutes</Label>
+              <Label htmlFor="minutes">Geschatte minuten</Label>
               <Input id="minutes" type="number" min="5" max="480" value={estimatedMinutes} onChange={(e) => setEstimatedMinutes(e.target.value)} />
             </div>
           </div>
           <div>
-            <Label>Priority</Label>
+            <Label>Prioriteit</Label>
             <div className="mt-1 flex gap-2">
               {(["low", "medium", "high"] as Priority[]).map((p) => (
                 <button
@@ -85,12 +91,12 @@ export function TaskForm({ onSave, initial, trigger }: TaskFormProps) {
                   onClick={() => setPriority(p)}
                   className={`priority-${p} rounded-full border px-3 py-1 text-xs font-medium capitalize transition-all ${priority === p ? "ring-2 ring-offset-1 ring-current" : "opacity-60"}`}
                 >
-                  {p}
+                  {PRIORITY_LABELS[p]}
                 </button>
               ))}
             </div>
           </div>
-          <Button type="submit" className="mt-2">{initial ? "Save Changes" : "Add Task"}</Button>
+          <Button type="submit" className="mt-2">{initial ? "Opslaan" : "Taak toevoegen"}</Button>
         </form>
       </DialogContent>
     </Dialog>

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Trash2, Clock } from "lucide-react";
+import { Plus, Trash2, Clock, Home } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const Schedule = () => {
@@ -42,13 +42,13 @@ const Schedule = () => {
 
   return (
     <div>
-      <h1 className="mb-6 font-display text-2xl font-bold">Schedule</h1>
+      <h1 className="mb-6 font-display text-2xl font-bold">Rooster</h1>
 
       {/* School end times */}
       <div className="mb-8">
         <h2 className="mb-3 flex items-center gap-2 font-display text-lg font-semibold">
           <Clock size={18} className="text-primary" />
-          School End Times
+          Schooltijden (einde)
         </h2>
         <div className="grid gap-3 sm:grid-cols-5">
           {WEEKDAYS.map((day) => (
@@ -65,11 +65,30 @@ const Schedule = () => {
         </div>
       </div>
 
+      {/* Commute time */}
+      <div className="mb-8">
+        <h2 className="mb-3 flex items-center gap-2 font-display text-lg font-semibold">
+          <Home size={18} className="text-primary" />
+          Reistijd naar huis
+        </h2>
+        <div className="max-w-xs rounded-xl border bg-card p-3">
+          <Label className="text-xs text-muted-foreground">Minuten</Label>
+          <Input
+            type="number"
+            min="0"
+            max="120"
+            value={schedule.commuteMinutes ?? 15}
+            onChange={(e) => setSchedule((prev) => ({ ...prev, commuteMinutes: parseInt(e.target.value) || 0 }))}
+            className="mt-1"
+          />
+        </div>
+      </div>
+
       {/* Bedtime */}
       <div className="mb-8">
-        <h2 className="mb-3 font-display text-lg font-semibold">Bedtime</h2>
+        <h2 className="mb-3 font-display text-lg font-semibold">Bedtijd</h2>
         <div className="max-w-xs rounded-xl border bg-card p-3">
-          <Label className="text-xs text-muted-foreground">Study ends at</Label>
+          <Label className="text-xs text-muted-foreground">Studeren stopt om</Label>
           <Input
             type="time"
             value={schedule.bedtime}
@@ -82,24 +101,24 @@ const Schedule = () => {
       {/* Activities */}
       <div>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-display text-lg font-semibold">After-School Activities</h2>
+          <h2 className="font-display text-lg font-semibold">Naschoolse Activiteiten</h2>
           <Dialog open={actOpen} onOpenChange={setActOpen}>
             <DialogTrigger asChild>
               <Button size="sm" variant="outline" className="gap-1">
-                <Plus size={14} /> Add
+                <Plus size={14} /> Toevoegen
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
-                <DialogTitle>Add Activity</DialogTitle>
+                <DialogTitle>Activiteit toevoegen</DialogTitle>
               </DialogHeader>
               <form onSubmit={addActivity} className="flex flex-col gap-4">
                 <div>
-                  <Label>Name</Label>
-                  <Input value={actName} onChange={(e) => setActName(e.target.value)} placeholder="Soccer practice" required />
+                  <Label>Naam</Label>
+                  <Input value={actName} onChange={(e) => setActName(e.target.value)} placeholder="Voetbaltraining" required />
                 </div>
                 <div>
-                  <Label>Day</Label>
+                  <Label>Dag</Label>
                   <Select value={actDay} onValueChange={(v) => setActDay(v as Weekday)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -115,11 +134,11 @@ const Schedule = () => {
                     <Input type="time" value={actStart} onChange={(e) => setActStart(e.target.value)} />
                   </div>
                   <div>
-                    <Label>End</Label>
+                    <Label>Einde</Label>
                     <Input type="time" value={actEnd} onChange={(e) => setActEnd(e.target.value)} />
                   </div>
                 </div>
-                <Button type="submit">Add Activity</Button>
+                <Button type="submit">Toevoegen</Button>
               </form>
             </DialogContent>
           </Dialog>
@@ -157,7 +176,7 @@ const Schedule = () => {
         })}
 
         {activities.length === 0 && (
-          <p className="py-8 text-center text-sm text-muted-foreground">No activities added yet</p>
+          <p className="py-8 text-center text-sm text-muted-foreground">Nog geen activiteiten toegevoegd</p>
         )}
       </div>
     </div>

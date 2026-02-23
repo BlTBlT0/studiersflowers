@@ -3,11 +3,11 @@ export type Weekday = "monday" | "tuesday" | "wednesday" | "thursday" | "friday"
 
 export const WEEKDAYS: Weekday[] = ["monday", "tuesday", "wednesday", "thursday", "friday"];
 export const WEEKDAY_LABELS: Record<Weekday, string> = {
-  monday: "Mon",
-  tuesday: "Tue",
-  wednesday: "Wed",
-  thursday: "Thu",
-  friday: "Fri",
+  monday: "Ma",
+  tuesday: "Di",
+  wednesday: "Wo",
+  thursday: "Do",
+  friday: "Vr",
 };
 
 export interface Task {
@@ -32,6 +32,7 @@ export interface Activity {
 export interface ScheduleSettings {
   schoolEndTimes: Record<Weekday, string>; // HH:MM per weekday
   bedtime: string; // HH:MM, default "21:30"
+  commuteMinutes: number; // minutes to get home from school
 }
 
 export interface PlanBlock {
@@ -56,18 +57,21 @@ export const DEFAULT_SCHEDULE: ScheduleSettings = {
     friday: "15:30",
   },
   bedtime: "21:30",
+  commuteMinutes: 15,
 };
 
 export const SUBJECTS = [
-  "Math",
-  "Science",
-  "English",
-  "History",
-  "Geography",
-  "Art",
-  "Music",
-  "PE",
-  "Computer Science",
-  "Foreign Language",
-  "Other",
+  "Kunst",
+  "Biologie",
+  "Aardrijkskunde",
+  "Wiskunde",
+  "Geschiedenis",
+  "Lichamelijke Opvoeding",
+  "Engels",
+  "Nederlands",
+  "Grieks",
+  "Wetenschap",
+  "Muziek",
+  "Frans",
+  "VVV",
 ];

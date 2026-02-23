@@ -35,12 +35,12 @@ export function TimelineBlock({ block, onToggle }: TimelineBlockProps) {
         <div className="flex items-center gap-2">
           {block.isBreak && <Coffee size={14} className="text-accent" />}
           <span className={cn("text-sm font-medium", block.completed && "line-through")}>
-            {block.taskTitle}
+            {block.isBreak ? "Pauze 🧃" : block.taskTitle}
           </span>
         </div>
         {!block.isBreak && (
           <span className="text-xs text-muted-foreground">
-            {block.subject} · {block.durationMinutes}min
+            {block.subject} · {block.durationMinutes} min
           </span>
         )}
       </div>

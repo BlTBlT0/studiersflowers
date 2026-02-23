@@ -31,7 +31,7 @@ function getAvailableSlots(
   const weekday = getWeekday(date);
   if (!weekday) return []; // weekend
 
-  const schoolEnd = timeToMinutes(schedule.schoolEndTimes[weekday]);
+  const schoolEnd = timeToMinutes(schedule.schoolEndTimes[weekday]) + (schedule.commuteMinutes || 0);
   const bedtime = timeToMinutes(schedule.bedtime);
 
   if (schoolEnd >= bedtime) return [];

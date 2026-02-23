@@ -44,14 +44,14 @@ const Homework = () => {
   return (
     <div>
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="font-display text-2xl font-bold">Homework</h1>
+        <h1 className="font-display text-2xl font-bold">Huiswerk</h1>
         <TaskForm onSave={addTask} />
       </div>
 
       <div className="relative mb-4">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
         <Input
-          placeholder="Search tasks..."
+          placeholder="Zoek taken..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-9"
@@ -67,7 +67,7 @@ const Homework = () => {
       {completed.length > 0 && (
         <div className="mt-6">
           <h3 className="mb-2 text-sm font-medium text-muted-foreground">
-            Completed ({completed.length})
+            Afgerond ({completed.length})
           </h3>
           <div className="flex flex-col gap-2">
             {completed.map((task) => (
@@ -79,8 +79,8 @@ const Homework = () => {
 
       {filtered.length === 0 && (
         <div className="py-16 text-center text-muted-foreground">
-          <p className="text-lg">No tasks yet</p>
-          <p className="text-sm">Click "Add Task" to get started</p>
+          <p className="text-lg">Nog geen taken</p>
+          <p className="text-sm">Klik op "Taak toevoegen" om te beginnen</p>
         </div>
       )}
     </div>
