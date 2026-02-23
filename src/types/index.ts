@@ -32,6 +32,7 @@ export interface Activity {
 export interface ScheduleSettings {
   schoolEndTimes: Record<Weekday, string>; // HH:MM per weekday
   bedtime: string; // HH:MM, default "21:30"
+  commuteMinutes: number; // minutes to get home from school
 }
 
 export interface PlanBlock {
