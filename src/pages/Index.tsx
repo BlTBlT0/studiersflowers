@@ -1,12 +1,80 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { format } from "date-fns";
+import { PlanBlock, Task, Activity, ScheduleSettings, DEFAULT_SCHEDULE } from "@/types";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { getTodayBlocks, getAvailableMinutes } from "@/lib/planner";
+import { TimelineBlock } from "@/components/TimelineBlock";
+import { Clock, CheckCircle2, BookOpen, Sparkles } from "lucide-react";
 
 const Index = () => {
+  const [tasks] = useLocalStorage<Task[]>("studyflow-tasks", []);
+  const [schedule] = useLocalStorage<ScheduleSettings>("studyflow-schedule", DEFAULT_SCHEDULE);
+  const [activities] = useLocalStorage<Activity[]>("studyflow-activities", []);
+  const [planBlocks, setPlanBlocks] = useLocalStorage<PlanBlock[]>("studyflow-plan", []);
+
+  const todayBlocks = getTodayBlocks(planBlocks);
+  const availableMinutes = getAvailableMinutes(new Date(), schedule, activities);
+  const completedBlocks = todayBlocks.filter((b) => b.completed && !b.isBreak).length;
+  const totalBlocks = todayBlocks.filter((b) => !b.isBreak).length;
+  const incompleteTasks = tasks.filter((t) => !t.completed).length;
+
+  const toggleBlock = (id: string) => {
+    setPlanBlocks((prev) =>
+      prev.map((b) => (b.id === id ? { ...b, completed: !b.completed } : b))
+    );
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
+    <div>
+      <div className="mb-6">
+        <h1 className="font-display text-2xl font-bold">Today's Plan</h1>
+        <p className="text-sm text-muted-foreground">{format(new Date(), "EEEE, MMMM d")}</p>
       </div>
+
+      {/* Stats */}
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className="rounded-xl border bg-card p-4">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Clock size={16} />
+            <span className="text-xs font-medium">Available</span>
+          </div>
+          <p className="mt-1 font-display text-2xl font-bold">
+            {Math.floor(availableMinutes / 60)}h {availableMinutes % 60}m
+          </p>
+        </div>
+        <div className="rounded-xl border bg-card p-4">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <CheckCircle2 size={16} />
+            <span className="text-xs font-medium">Progress</span>
+          </div>
+          <p className="mt-1 font-display text-2xl font-bold">
+            {completedBlocks}/{totalBlocks}
+          </p>
+        </div>
+        <div className="col-span-2 rounded-xl border bg-card p-4 sm:col-span-1">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <BookOpen size={16} />
+            <span className="text-xs font-medium">Pending Tasks</span>
+          </div>
+          <p className="mt-1 font-display text-2xl font-bold">{incompleteTasks}</p>
+        </div>
+      </div>
+
+      {/* Timeline */}
+      {todayBlocks.length > 0 ? (
+        <div className="flex flex-col gap-2">
+          {todayBlocks.map((block) => (
+            <TimelineBlock key={block.id} block={block} onToggle={toggleBlock} />
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed bg-card/50 py-16 text-center">
+          <Sparkles size={40} className="mb-3 text-primary/40" />
+          <h3 className="font-display text-lg font-semibold">No plan generated yet</h3>
+          <p className="mt-1 max-w-xs text-sm text-muted-foreground">
+            Add homework tasks, set your schedule, then head to the Planner to generate today's study plan.
+          </p>
+        </div>
+      )}
     </div>
   );
 };
