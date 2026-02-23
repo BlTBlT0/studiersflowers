@@ -1,0 +1,86 @@
+import { ReactNode } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { LayoutDashboard, BookOpen, Calendar, Wand2, Menu, X } from "lucide-react";
+import { useState } from "react";
+import { cn } from "@/lib/utils";
+
+const navItems = [
+  { to: "/", icon: LayoutDashboard, label: "Dashboard" },
+  { to: "/homework", icon: BookOpen, label: "Homework" },
+  { to: "/schedule", icon: Calendar, label: "Schedule" },
+  { to: "/planner", icon: Wand2, label: "Planner" },
+];
+
+export function Layout({ children }: { children: ReactNode }) {
+  const location = useLocation();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Mobile header */}
+      <header className="sticky top-0 z-50 flex items-center justify-between border-b bg-card px-4 py-3 md:hidden">
+        <h1 className="font-display text-lg font-bold text-primary">StudyFlow</h1>
+        <button onClick={() => setMobileOpen(!mobileOpen)} className="text-foreground">
+          {mobileOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
+      </header>
+
+      {/* Mobile nav overlay */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm md:hidden" onClick={() => setMobileOpen(false)}>
+          <nav className="absolute left-0 top-14 w-64 rounded-r-2xl border-r bg-card p-4 shadow-lg" onClick={(e) => e.stopPropagation()}>
+            {navItems.map((item) => (
+              <Link
+                key={item.to}
+                to={item.to}
+                onClick={() => setMobileOpen(false)}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                  location.pathname === item.to
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                <item.icon size={18} />
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+        </div>
+      )}
+
+      <div className="flex">
+        {/* Desktop sidebar */}
+        <aside className="hidden w-64 shrink-0 border-r bg-card md:block">
+          <div className="sticky top-0 flex h-screen flex-col p-4">
+            <h1 className="mb-8 font-display text-xl font-bold text-primary">📚 StudyFlow</h1>
+            <nav className="flex flex-col gap-1">
+              {navItems.map((item) => (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                    location.pathname === item.to
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  )}
+                >
+                  <item.icon size={18} />
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
+          </div>
+        </aside>
+
+        {/* Main content */}
+        <main className="flex-1 overflow-auto">
+          <div className="mx-auto max-w-4xl p-4 md:p-8">
+            {children}
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}
