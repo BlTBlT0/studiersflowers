@@ -9,7 +9,7 @@ interface TaskCardProps {
   task: DbTask;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
-  onEdit: (id: string, data: { title: string; subject: string; due_date: string; estimated_minutes: number; priority: string }) => void;
+  onEdit: (id: string, data: { title: string; subject: string; due_date: string; estimated_minutes: number; priority: string; is_daily_practice: boolean }) => void;
 }
 
 export function TaskCard({ task, onToggle, onDelete, onEdit }: TaskCardProps) {
