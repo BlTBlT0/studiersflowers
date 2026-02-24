@@ -14,7 +14,181 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      activities: {
+        Row: {
+          end_time: string
+          id: string
+          name: string
+          start_time: string
+          user_id: string
+          weekday: string
+        }
+        Insert: {
+          end_time: string
+          id?: string
+          name: string
+          start_time: string
+          user_id: string
+          weekday: string
+        }
+        Update: {
+          end_time?: string
+          id?: string
+          name?: string
+          start_time?: string
+          user_id?: string
+          weekday?: string
+        }
+        Relationships: []
+      }
+      plan_blocks: {
+        Row: {
+          completed: boolean
+          date: string
+          duration_minutes: number
+          end_time: string
+          id: string
+          is_break: boolean
+          start_time: string
+          subject: string
+          task_id: string | null
+          task_title: string
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean
+          date: string
+          duration_minutes: number
+          end_time: string
+          id?: string
+          is_break?: boolean
+          start_time: string
+          subject?: string
+          task_id?: string | null
+          task_title: string
+          user_id: string
+        }
+        Update: {
+          completed?: boolean
+          date?: string
+          duration_minutes?: number
+          end_time?: string
+          id?: string
+          is_break?: boolean
+          start_time?: string
+          subject?: string
+          task_id?: string | null
+          task_title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_blocks_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      schedule_settings: {
+        Row: {
+          bedtime: string
+          commute_minutes: number
+          id: string
+          school_end_times: Json
+          user_id: string
+        }
+        Insert: {
+          bedtime?: string
+          commute_minutes?: number
+          id?: string
+          school_end_times?: Json
+          user_id: string
+        }
+        Update: {
+          bedtime?: string
+          commute_minutes?: number
+          id?: string
+          school_end_times?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
+      tasks: {
+        Row: {
+          completed: boolean
+          created_at: string
+          due_date: string
+          estimated_minutes: number
+          id: string
+          priority: string
+          subject: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean
+          created_at?: string
+          due_date: string
+          estimated_minutes?: number
+          id?: string
+          priority?: string
+          subject: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          completed?: boolean
+          created_at?: string
+          due_date?: string
+          estimated_minutes?: number
+          id?: string
+          priority?: string
+          subject?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      time_tracking: {
+        Row: {
+          actual_minutes: number
+          completed_at: string
+          estimated_minutes: number
+          id: string
+          subject: string
+          task_id: string | null
+          user_id: string
+        }
+        Insert: {
+          actual_minutes: number
+          completed_at?: string
+          estimated_minutes: number
+          id?: string
+          subject: string
+          task_id?: string | null
+          user_id: string
+        }
+        Update: {
+          actual_minutes?: number
+          completed_at?: string
+          estimated_minutes?: number
+          id?: string
+          subject?: string
+          task_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_tracking_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
