@@ -117,7 +117,15 @@ export function generatePlan(
   for (let i = 0; i < MAX_DAYS; i++) {
     const d = addDays(today, i);
     const dateStr = format(d, "yyyy-MM-dd");
-    const slots = getAvailableSlots(d, schoolEndTimes, bedtime, commuteMinutes, activities);
+    let slots = getAvailableSlots(d, schoolEndTimes, bedtime, commuteMinutes, activities);
+
+    // For today, filter out time that has already passed
+    if (i === 0) {
+      slots = slots
+        .map((s) => ({ start: Math.max(s.start, currentTimeMinutes), end: s.end }))
+        .filter((s) => s.end > s.start);
+    }
+
     const totalMinutes = slots.reduce((sum, s) => sum + (s.end - s.start), 0);
     if (totalMinutes > 0) daySlots.push({ date: d, dateStr, slots, totalMinutes });
   }
