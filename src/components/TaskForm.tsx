@@ -36,19 +36,30 @@ export function TaskForm({ onSave, initial, trigger }: TaskFormProps) {
   const [subject, setSubject] = useState(initial?.subject || "");
   const [dueDate, setDueDate] = useState(initial?.due_date || "");
   const [estimatedMinutes, setEstimatedMinutes] = useState(initial?.estimated_minutes?.toString() || "30");
+  const [unknownTime, setUnknownTime] = useState(initial?.estimated_minutes === 30 && !initial?.title);
   const [priority, setPriority] = useState<Priority>((initial?.priority as Priority) || "medium");
+  const [isDailyPractice, setIsDailyPractice] = useState(initial?.is_daily_practice || false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !subject || !dueDate) return;
-    onSave({ title, subject, due_date: dueDate, estimated_minutes: parseInt(estimatedMinutes) || 30, priority });
+    onSave({
+      title,
+      subject,
+      due_date: dueDate,
+      estimated_minutes: unknownTime ? 30 : (parseInt(estimatedMinutes) || 30),
+      priority,
+      is_daily_practice: isDailyPractice,
+    });
     setOpen(false);
     if (!initial) {
       setTitle("");
       setSubject("");
       setDueDate("");
       setEstimatedMinutes("30");
+      setUnknownTime(false);
       setPriority("medium");
+      setIsDailyPractice(false);
     }
   };
 
