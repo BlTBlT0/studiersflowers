@@ -97,8 +97,9 @@ export function generatePlan(
   tracking: DbTimeTracking[] = [],
   startDate?: Date
 ): Omit<TablesInsert<"plan_blocks">, "user_id">[] {
-  const start = startDate || new Date();
-  const today = startOfDay(start);
+  const now = startDate || new Date();
+  const today = startOfDay(now);
+  const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
   const subjectAverages = getSubjectAverages(tracking);
 
   const priorityOrder: Record<string, number> = { high: 3, medium: 2, low: 1 };
