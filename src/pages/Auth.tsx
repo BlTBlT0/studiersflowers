@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { BookOpen } from "lucide-react";
+import logo from "@/assets/logo.png";
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -42,8 +42,8 @@ const Auth = () => {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-            <BookOpen size={28} className="text-primary" />
+          <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center">
+            <img src={logo} alt="StudyFlow" className="h-16 w-16 rounded-2xl" />
           </div>
           <h1 className="font-display text-2xl font-bold">StudyFlow</h1>
           <p className="mt-1 text-sm text-muted-foreground">

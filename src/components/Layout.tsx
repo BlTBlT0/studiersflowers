@@ -4,6 +4,7 @@ import { LayoutDashboard, BookOpen, Calendar, Wand2, Menu, X, LogOut } from "luc
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import logo from "@/assets/logo.png";
 
 const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -21,7 +22,10 @@ export function Layout({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-background">
       {/* Mobile header */}
       <header className="sticky top-0 z-50 flex items-center justify-between border-b bg-card px-4 py-3 md:hidden">
-        <h1 className="font-display text-lg font-bold text-primary">StudyFlow</h1>
+        <div className="flex items-center gap-2">
+          <img src={logo} alt="StudyFlow" className="h-8 w-8 rounded-lg" />
+          <span className="font-display text-lg font-bold text-primary">StudyFlow</span>
+        </div>
         <button onClick={() => setMobileOpen(!mobileOpen)} className="text-foreground">
           {mobileOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
@@ -60,9 +64,12 @@ export function Layout({ children }: { children: ReactNode }) {
 
       <div className="flex">
         {/* Desktop sidebar */}
-        <aside className="hidden w-64 shrink-0 border-r bg-card md:block">
+        <aside className="hidden w-64 shrink-0 md:block bg-sidebar text-sidebar-foreground">
           <div className="sticky top-0 flex h-screen flex-col p-4">
-            <h1 className="mb-8 font-display text-xl font-bold text-primary">📚 StudyFlow</h1>
+            <div className="mb-8 flex items-center gap-3">
+              <img src={logo} alt="StudyFlow" className="h-10 w-10 rounded-xl" />
+              <h1 className="font-display text-xl font-bold text-sidebar-foreground">StudyFlow</h1>
+            </div>
             <nav className="flex flex-1 flex-col gap-1">
               {navItems.map((item) => (
                 <Link
@@ -71,8 +78,8 @@ export function Layout({ children }: { children: ReactNode }) {
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                     location.pathname === item.to
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
                   )}
                 >
                   <item.icon size={18} />
@@ -82,7 +89,7 @@ export function Layout({ children }: { children: ReactNode }) {
             </nav>
             <button
               onClick={signOut}
-              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
             >
               <LogOut size={18} />
               Uitloggen
