@@ -9,7 +9,7 @@ interface TaskCardProps {
   task: DbTask;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
-  onEdit: (id: string, data: { title: string; subject: string; due_date: string; estimated_minutes: number; priority: string }) => void;
+  onEdit: (id: string, data: { title: string; subject: string; due_date: string; estimated_minutes: number; priority: string; is_daily_practice: boolean }) => void;
 }
 
 export function TaskCard({ task, onToggle, onDelete, onEdit }: TaskCardProps) {
@@ -36,8 +36,13 @@ export function TaskCard({ task, onToggle, onDelete, onEdit }: TaskCardProps) {
         <div className="flex items-center gap-2">
           <span className={cn("font-medium", task.completed && "line-through")}>{task.title}</span>
           <span className={`priority-${task.priority} rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase`}>
-            {task.priority}
+             {task.priority}
           </span>
+          {task.is_daily_practice && (
+            <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold text-accent-foreground">
+              📖 dagelijks
+            </span>
+          )}
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
           <span className="rounded bg-secondary px-1.5 py-0.5 font-medium text-secondary-foreground">

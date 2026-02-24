@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { SUBJECTS } from "@/types";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,11 +16,12 @@ interface TaskFormData {
   due_date: string;
   estimated_minutes: number;
   priority: string;
+  is_daily_practice: boolean;
 }
 
 interface TaskFormProps {
   onSave: (task: TaskFormData) => void;
-  initial?: { title: string; subject: string; due_date: string; estimated_minutes: number; priority: string };
+  initial?: { title: string; subject: string; due_date: string; estimated_minutes: number; priority: string; is_daily_practice?: boolean };
   trigger?: React.ReactNode;
 }
 
@@ -35,19 +37,30 @@ export function TaskForm({ onSave, initial, trigger }: TaskFormProps) {
   const [subject, setSubject] = useState(initial?.subject || "");
   const [dueDate, setDueDate] = useState(initial?.due_date || "");
   const [estimatedMinutes, setEstimatedMinutes] = useState(initial?.estimated_minutes?.toString() || "30");
+  const [unknownTime, setUnknownTime] = useState(initial?.estimated_minutes === 30 && !initial?.title);
   const [priority, setPriority] = useState<Priority>((initial?.priority as Priority) || "medium");
+  const [isDailyPractice, setIsDailyPractice] = useState(initial?.is_daily_practice || false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !subject || !dueDate) return;
-    onSave({ title, subject, due_date: dueDate, estimated_minutes: parseInt(estimatedMinutes) || 30, priority });
+    onSave({
+      title,
+      subject,
+      due_date: dueDate,
+      estimated_minutes: unknownTime ? 30 : (parseInt(estimatedMinutes) || 30),
+      priority,
+      is_daily_practice: isDailyPractice,
+    });
     setOpen(false);
     if (!initial) {
       setTitle("");
       setSubject("");
       setDueDate("");
       setEstimatedMinutes("30");
+      setUnknownTime(false);
       setPriority("medium");
+      setIsDailyPractice(false);
     }
   };
 
@@ -88,9 +101,17 @@ export function TaskForm({ onSave, initial, trigger }: TaskFormProps) {
             </div>
             <div>
               <Label htmlFor="minutes">Geschatte minuten</Label>
-              <Input id="minutes" type="number" min="5" max="480" value={estimatedMinutes} onChange={(e) => setEstimatedMinutes(e.target.value)} />
+              <Input id="minutes" type="number" min="5" max="480" value={unknownTime ? "" : estimatedMinutes} onChange={(e) => { setEstimatedMinutes(e.target.value); setUnknownTime(false); }} disabled={unknownTime} placeholder={unknownTime ? "Weet niet" : ""} />
+              <label className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                <Checkbox checked={unknownTime} onCheckedChange={(c) => { setUnknownTime(!!c); if (c) setEstimatedMinutes("30"); }} />
+                Weet niet
+              </label>
             </div>
           </div>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <Checkbox checked={isDailyPractice} onCheckedChange={(c) => setIsDailyPractice(!!c)} />
+            <span className="text-sm">Dagelijks oefenen (bijv. woordjes leren, 5 min/dag)</span>
+          </label>
           <div>
             <Label>Prioriteit</Label>
             <div className="mt-1 flex gap-2">
