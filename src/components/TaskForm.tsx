@@ -15,6 +15,7 @@ interface TaskFormData {
   due_date: string;
   estimated_minutes: number;
   priority: string;
+  is_daily_practice: boolean;
 }
 
 interface TaskFormProps {
