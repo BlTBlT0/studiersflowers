@@ -146,12 +146,11 @@ export function generatePlan(
   const totalAvailable = daySlots.reduce((s, d) => s + d.totalMinutes, 0);
 
   // Target: spread evenly, but respect deadlines
-  // Max study per day = total / available days, but at least enough for due-today tasks
   const daysWithTime = daySlots.length;
   const targetPerDay = daysWithTime > 0 ? Math.ceil(totalStudyMinutes / daysWithTime) : 90;
-  // Hard cap: max 90 min study per day to keep it manageable
+  // Ensure we can fit all tasks: minimum 45 min/day, max 90 min/day
   const MAX_STUDY_PER_DAY = 90;
-  const maxPerDay = Math.min(Math.max(targetPerDay, 30), MAX_STUDY_PER_DAY);
+  const maxPerDay = Math.min(Math.max(targetPerDay, 45), MAX_STUDY_PER_DAY);
 
   const blocks: Omit<TablesInsert<"plan_blocks">, "user_id">[] = [];
   const remainingChunks = [...allChunks];
