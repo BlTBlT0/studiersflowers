@@ -284,6 +284,42 @@ export function generatePlan(
     }
   }
 
+  // Schedule daily practice tasks: 5 min per day on each available day before deadline
+  for (const task of dailyPracticeTasks) {
+    const deadlineStr = task.due_date;
+    for (const dayInfo of daySlots) {
+      // Must be scheduled BEFORE the deadline day
+      if (dayInfo.dateStr >= deadlineStr) break;
+
+      // Find first available slot for a short 5-min block
+      for (const slot of dayInfo.slots) {
+        let cursor = slot.start;
+        for (const b of blocks) {
+          if (b.date === dayInfo.dateStr) {
+            const bEnd = timeToMinutes(b.end_time);
+            if (bEnd > cursor && timeToMinutes(b.start_time) < slot.end) {
+              cursor = Math.max(cursor, bEnd);
+            }
+          }
+        }
+        if (cursor + 5 <= slot.end) {
+          blocks.push({
+            task_id: task.id,
+            task_title: `${task.title} 📖`,
+            subject: task.subject,
+            date: dayInfo.dateStr,
+            start_time: minutesToTime(cursor),
+            end_time: minutesToTime(cursor + 5),
+            duration_minutes: 5,
+            completed: false,
+            is_break: false,
+          });
+          break; // Only one block per day for daily practice
+        }
+      }
+    }
+  }
+
   return blocks;
 }
 

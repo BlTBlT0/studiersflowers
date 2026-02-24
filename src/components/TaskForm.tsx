@@ -20,7 +20,7 @@ interface TaskFormData {
 
 interface TaskFormProps {
   onSave: (task: TaskFormData) => void;
-  initial?: { title: string; subject: string; due_date: string; estimated_minutes: number; priority: string };
+  initial?: { title: string; subject: string; due_date: string; estimated_minutes: number; priority: string; is_daily_practice?: boolean };
   trigger?: React.ReactNode;
 }
 
