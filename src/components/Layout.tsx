@@ -4,6 +4,7 @@ import { LayoutDashboard, BookOpen, Calendar, Wand2, Menu, X, LogOut } from "luc
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import logo from "@/assets/logo.png";
 
 const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
