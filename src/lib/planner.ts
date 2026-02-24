@@ -97,8 +97,9 @@ export function generatePlan(
   tracking: DbTimeTracking[] = [],
   startDate?: Date
 ): Omit<TablesInsert<"plan_blocks">, "user_id">[] {
-  const start = startDate || new Date();
-  const today = startOfDay(start);
+  const now = startDate || new Date();
+  const today = startOfDay(now);
+  const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
   const subjectAverages = getSubjectAverages(tracking);
 
   const priorityOrder: Record<string, number> = { high: 3, medium: 2, low: 1 };
@@ -116,7 +117,15 @@ export function generatePlan(
   for (let i = 0; i < MAX_DAYS; i++) {
     const d = addDays(today, i);
     const dateStr = format(d, "yyyy-MM-dd");
-    const slots = getAvailableSlots(d, schoolEndTimes, bedtime, commuteMinutes, activities);
+    let slots = getAvailableSlots(d, schoolEndTimes, bedtime, commuteMinutes, activities);
+
+    // For today, filter out time that has already passed
+    if (i === 0) {
+      slots = slots
+        .map((s) => ({ start: Math.max(s.start, currentTimeMinutes), end: s.end }))
+        .filter((s) => s.end > s.start);
+    }
+
     const totalMinutes = slots.reduce((sum, s) => sum + (s.end - s.start), 0);
     if (totalMinutes > 0) daySlots.push({ date: d, dateStr, slots, totalMinutes });
   }
