@@ -23,7 +23,7 @@ const Homework = () => {
     deleteTask.mutate(id);
   };
 
-  const handleEdit = (id: string, data: { title: string; subject: string; due_date: string; estimated_minutes: number; priority: string }) => {
+  const handleEdit = (id: string, data: { title: string; subject: string; due_date: string; estimated_minutes: number; priority: string; is_daily_practice: boolean }) => {
     updateTask.mutate({ id, ...data });
   };
 
