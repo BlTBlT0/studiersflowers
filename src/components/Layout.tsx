@@ -22,7 +22,10 @@ export function Layout({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-background">
       {/* Mobile header */}
       <header className="sticky top-0 z-50 flex items-center justify-between border-b bg-card px-4 py-3 md:hidden">
-        <h1 className="font-display text-lg font-bold text-primary">StudyFlow</h1>
+        <div className="flex items-center gap-2">
+          <img src={logo} alt="StudyFlow" className="h-8 w-8 rounded-lg" />
+          <span className="font-display text-lg font-bold text-primary">StudyFlow</span>
+        </div>
         <button onClick={() => setMobileOpen(!mobileOpen)} className="text-foreground">
           {mobileOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
