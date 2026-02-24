@@ -1,5 +1,4 @@
-import { Task } from "@/types";
-import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { useTasks, useTaskMutations } from "@/hooks/useSupabaseData";
 import { TaskForm } from "@/components/TaskForm";
 import { TaskCard } from "@/components/TaskCard";
 import { useState } from "react";
@@ -7,29 +6,25 @@ import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 
 const Homework = () => {
-  const [tasks, setTasks] = useLocalStorage<Task[]>("studyflow-tasks", []);
+  const { data: tasks = [], isLoading } = useTasks();
+  const { addTask, updateTask, deleteTask } = useTaskMutations();
   const [search, setSearch] = useState("");
 
-  const addTask = (data: Omit<Task, "id" | "completed" | "createdAt">) => {
-    const newTask: Task = {
-      ...data,
-      id: crypto.randomUUID(),
-      completed: false,
-      createdAt: new Date().toISOString(),
-    };
-    setTasks((prev) => [newTask, ...prev]);
+  const handleAdd = (data: { title: string; subject: string; due_date: string; estimated_minutes: number; priority: string }) => {
+    addTask.mutate(data);
   };
 
-  const toggleTask = (id: string) => {
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t)));
+  const handleToggle = (id: string) => {
+    const task = tasks.find((t) => t.id === id);
+    if (task) updateTask.mutate({ id, completed: !task.completed });
   };
 
-  const deleteTask = (id: string) => {
-    setTasks((prev) => prev.filter((t) => t.id !== id));
+  const handleDelete = (id: string) => {
+    deleteTask.mutate(id);
   };
 
-  const editTask = (id: string, data: Omit<Task, "id" | "completed" | "createdAt">) => {
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...data } : t)));
+  const handleEdit = (id: string, data: { title: string; subject: string; due_date: string; estimated_minutes: number; priority: string }) => {
+    updateTask.mutate({ id, ...data });
   };
 
   const filtered = tasks.filter(
@@ -41,11 +36,13 @@ const Homework = () => {
   const incomplete = filtered.filter((t) => !t.completed);
   const completed = filtered.filter((t) => t.completed);
 
+  if (isLoading) return <div className="py-16 text-center text-muted-foreground">Laden...</div>;
+
   return (
     <div>
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="font-display text-2xl font-bold">Huiswerk</h1>
-        <TaskForm onSave={addTask} />
+        <TaskForm onSave={handleAdd} />
       </div>
 
       <div className="relative mb-4">
@@ -60,7 +57,7 @@ const Homework = () => {
 
       <div className="flex flex-col gap-2">
         {incomplete.map((task) => (
-          <TaskCard key={task.id} task={task} onToggle={toggleTask} onDelete={deleteTask} onEdit={editTask} />
+          <TaskCard key={task.id} task={task} onToggle={handleToggle} onDelete={handleDelete} onEdit={handleEdit} />
         ))}
       </div>
 
@@ -71,13 +68,13 @@ const Homework = () => {
           </h3>
           <div className="flex flex-col gap-2">
             {completed.map((task) => (
-              <TaskCard key={task.id} task={task} onToggle={toggleTask} onDelete={deleteTask} onEdit={editTask} />
+              <TaskCard key={task.id} task={task} onToggle={handleToggle} onDelete={handleDelete} onEdit={handleEdit} />
             ))}
           </div>
         </div>
       )}
 
-      {filtered.length === 0 && (
+      {filtered.length === 0 && !isLoading && (
         <div className="py-16 text-center text-muted-foreground">
           <p className="text-lg">Nog geen taken</p>
           <p className="text-sm">Klik op "Taak toevoegen" om te beginnen</p>

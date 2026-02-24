@@ -1,44 +1,67 @@
-import { useState } from "react";
-import { ScheduleSettings, Activity, DEFAULT_SCHEDULE, WEEKDAYS, WEEKDAY_LABELS, Weekday } from "@/types";
-import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { useState, useEffect } from "react";
+import { WEEKDAYS, WEEKDAY_LABELS, Weekday } from "@/types";
+import { useScheduleSettings, useScheduleSettingsMutations, useActivities, useActivityMutations } from "@/hooks/useSupabaseData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus, Trash2, Clock, Home } from "lucide-react";
-import { cn } from "@/lib/utils";
+
+const DEFAULT_SCHOOL_END_TIMES = {
+  monday: "15:30", tuesday: "15:30", wednesday: "15:30", thursday: "15:30", friday: "15:30",
+};
 
 const Schedule = () => {
-  const [schedule, setSchedule] = useLocalStorage<ScheduleSettings>("studyflow-schedule", DEFAULT_SCHEDULE);
-  const [activities, setActivities] = useLocalStorage<Activity[]>("studyflow-activities", []);
+  const { data: dbSettings, isLoading } = useScheduleSettings();
+  const { upsertSettings } = useScheduleSettingsMutations();
+  const { data: activities = [] } = useActivities();
+  const { addActivity, deleteActivity } = useActivityMutations();
+
+  const [schoolEndTimes, setSchoolEndTimes] = useState<Record<Weekday, string>>(DEFAULT_SCHOOL_END_TIMES);
+  const [bedtime, setBedtime] = useState("21:30");
+  const [commuteMinutes, setCommuteMinutes] = useState(15);
+
   const [actOpen, setActOpen] = useState(false);
   const [actName, setActName] = useState("");
   const [actDay, setActDay] = useState<Weekday>("monday");
   const [actStart, setActStart] = useState("16:00");
   const [actEnd, setActEnd] = useState("17:00");
 
-  const updateSchoolEnd = (day: Weekday, time: string) => {
-    setSchedule((prev) => ({
-      ...prev,
-      schoolEndTimes: { ...prev.schoolEndTimes, [day]: time },
-    }));
+  // Sync from DB
+  useEffect(() => {
+    if (dbSettings) {
+      const times = dbSettings.school_end_times as Record<string, string>;
+      setSchoolEndTimes(times as Record<Weekday, string>);
+      setBedtime(dbSettings.bedtime?.slice(0, 5) || "21:30");
+      setCommuteMinutes(dbSettings.commute_minutes ?? 15);
+    }
+  }, [dbSettings]);
+
+  const saveSettings = () => {
+    upsertSettings.mutate({
+      school_end_times: schoolEndTimes,
+      bedtime,
+      commute_minutes: commuteMinutes,
+    });
   };
 
-  const addActivity = (e: React.FormEvent) => {
+  const updateSchoolEnd = (day: Weekday, time: string) => {
+    setSchoolEndTimes((prev) => ({ ...prev, [day]: time }));
+  };
+
+  // Auto-save on change (debounced via blur)
+  const handleBlur = () => saveSettings();
+
+  const handleAddActivity = (e: React.FormEvent) => {
     e.preventDefault();
     if (!actName) return;
-    setActivities((prev) => [
-      ...prev,
-      { id: crypto.randomUUID(), name: actName, weekday: actDay, startTime: actStart, endTime: actEnd },
-    ]);
+    addActivity.mutate({ name: actName, weekday: actDay, start_time: actStart, end_time: actEnd });
     setActOpen(false);
     setActName("");
   };
 
-  const deleteActivity = (id: string) => {
-    setActivities((prev) => prev.filter((a) => a.id !== id));
-  };
+  if (isLoading) return <div className="py-16 text-center text-muted-foreground">Laden...</div>;
 
   return (
     <div>
@@ -56,8 +79,9 @@ const Schedule = () => {
               <Label className="text-xs text-muted-foreground">{WEEKDAY_LABELS[day]}</Label>
               <Input
                 type="time"
-                value={schedule.schoolEndTimes[day]}
+                value={schoolEndTimes[day]}
                 onChange={(e) => updateSchoolEnd(day, e.target.value)}
+                onBlur={handleBlur}
                 className="mt-1"
               />
             </div>
@@ -77,8 +101,9 @@ const Schedule = () => {
             type="number"
             min="0"
             max="120"
-            value={schedule.commuteMinutes ?? 15}
-            onChange={(e) => setSchedule((prev) => ({ ...prev, commuteMinutes: parseInt(e.target.value) || 0 }))}
+            value={commuteMinutes}
+            onChange={(e) => setCommuteMinutes(parseInt(e.target.value) || 0)}
+            onBlur={handleBlur}
             className="mt-1"
           />
         </div>
@@ -91,8 +116,9 @@ const Schedule = () => {
           <Label className="text-xs text-muted-foreground">Studeren stopt om</Label>
           <Input
             type="time"
-            value={schedule.bedtime}
-            onChange={(e) => setSchedule((prev) => ({ ...prev, bedtime: e.target.value }))}
+            value={bedtime}
+            onChange={(e) => setBedtime(e.target.value)}
+            onBlur={handleBlur}
             className="mt-1"
           />
         </div>
@@ -112,7 +138,7 @@ const Schedule = () => {
               <DialogHeader>
                 <DialogTitle>Activiteit toevoegen</DialogTitle>
               </DialogHeader>
-              <form onSubmit={addActivity} className="flex flex-col gap-4">
+              <form onSubmit={handleAddActivity} className="flex flex-col gap-4">
                 <div>
                   <Label>Naam</Label>
                   <Input value={actName} onChange={(e) => setActName(e.target.value)} placeholder="Voetbaltraining" required />
@@ -159,11 +185,11 @@ const Schedule = () => {
                     <div>
                       <span className="text-sm font-medium">{act.name}</span>
                       <span className="ml-2 text-xs text-muted-foreground">
-                        {act.startTime} – {act.endTime}
+                        {act.start_time.slice(0, 5)} – {act.end_time.slice(0, 5)}
                       </span>
                     </div>
                     <button
-                      onClick={() => deleteActivity(act.id)}
+                      onClick={() => deleteActivity.mutate(act.id)}
                       className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                     >
                       <Trash2 size={14} />

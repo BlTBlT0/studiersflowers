@@ -1,8 +1,9 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, BookOpen, Calendar, Wand2, Menu, X } from "lucide-react";
+import { LayoutDashboard, BookOpen, Calendar, Wand2, Menu, X, LogOut } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 
 const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -14,6 +15,7 @@ const navItems = [
 export function Layout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { signOut } = useAuth();
 
   return (
     <div className="min-h-screen bg-background">
@@ -45,6 +47,13 @@ export function Layout({ children }: { children: ReactNode }) {
                 {item.label}
               </Link>
             ))}
+            <button
+              onClick={signOut}
+              className="mt-4 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <LogOut size={18} />
+              Uitloggen
+            </button>
           </nav>
         </div>
       )}
@@ -54,7 +63,7 @@ export function Layout({ children }: { children: ReactNode }) {
         <aside className="hidden w-64 shrink-0 border-r bg-card md:block">
           <div className="sticky top-0 flex h-screen flex-col p-4">
             <h1 className="mb-8 font-display text-xl font-bold text-primary">📚 StudyFlow</h1>
-            <nav className="flex flex-col gap-1">
+            <nav className="flex flex-1 flex-col gap-1">
               {navItems.map((item) => (
                 <Link
                   key={item.to}
@@ -71,6 +80,13 @@ export function Layout({ children }: { children: ReactNode }) {
                 </Link>
               ))}
             </nav>
+            <button
+              onClick={signOut}
+              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <LogOut size={18} />
+              Uitloggen
+            </button>
           </div>
         </aside>
 

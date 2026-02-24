@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Task, SUBJECTS, Priority } from "@/types";
+import { SUBJECTS } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,9 +7,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus } from "lucide-react";
 
+type Priority = "low" | "medium" | "high";
+
+interface TaskFormData {
+  title: string;
+  subject: string;
+  due_date: string;
+  estimated_minutes: number;
+  priority: string;
+}
+
 interface TaskFormProps {
-  onSave: (task: Omit<Task, "id" | "completed" | "createdAt">) => void;
-  initial?: Task;
+  onSave: (task: TaskFormData) => void;
+  initial?: { title: string; subject: string; due_date: string; estimated_minutes: number; priority: string };
   trigger?: React.ReactNode;
 }
 
@@ -23,14 +33,14 @@ export function TaskForm({ onSave, initial, trigger }: TaskFormProps) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState(initial?.title || "");
   const [subject, setSubject] = useState(initial?.subject || "");
-  const [dueDate, setDueDate] = useState(initial?.dueDate || "");
-  const [estimatedMinutes, setEstimatedMinutes] = useState(initial?.estimatedMinutes?.toString() || "30");
-  const [priority, setPriority] = useState<Priority>(initial?.priority || "medium");
+  const [dueDate, setDueDate] = useState(initial?.due_date || "");
+  const [estimatedMinutes, setEstimatedMinutes] = useState(initial?.estimated_minutes?.toString() || "30");
+  const [priority, setPriority] = useState<Priority>((initial?.priority as Priority) || "medium");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !subject || !dueDate) return;
-    onSave({ title, subject, dueDate, estimatedMinutes: parseInt(estimatedMinutes) || 30, priority });
+    onSave({ title, subject, due_date: dueDate, estimated_minutes: parseInt(estimatedMinutes) || 30, priority });
     setOpen(false);
     if (!initial) {
       setTitle("");
