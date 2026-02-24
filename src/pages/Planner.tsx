@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useTasks, useActivities, useScheduleSettings, usePlanBlocks, usePlanBlockMutations, useTimeTracking, useTimeTrackingMutations, DbPlanBlock } from "@/hooks/useSupabaseData";
 import { generatePlan } from "@/lib/planner";
 import { TimelineBlock } from "@/components/TimelineBlock";
@@ -6,6 +7,22 @@ import { Wand2, CalendarDays } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { nl } from "date-fns/locale";
 import { toast } from "sonner";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  DragOverEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 
 const Planner = () => {
   const { data: tasks = [] } = useTasks();
@@ -15,6 +32,12 @@ const Planner = () => {
   const { savePlan, updateBlock } = usePlanBlockMutations();
   const { data: tracking = [] } = useTimeTracking();
   const { addTracking } = useTimeTrackingMutations();
+  const [activeBlock, setActiveBlock] = useState<DbPlanBlock | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor)
+  );
 
   const schoolEndTimes = (dbSettings?.school_end_times as Record<string, string>) || {
     monday: "15:30", tuesday: "15:30", wednesday: "15:30", thursday: "15:30", friday: "15:30",
@@ -43,15 +66,12 @@ const Planner = () => {
   const moveBlock = (id: string, newDate: string, newStartTime: string) => {
     const block = planBlocks.find((b) => b.id === id);
     if (!block) return;
-
-    // Calculate new end time
     const [h, m] = newStartTime.split(":").map(Number);
     const startMins = h * 60 + m;
     const endMins = startMins + block.duration_minutes;
     const endH = Math.floor(endMins / 60);
     const endM = endMins % 60;
     const newEndTime = `${endH.toString().padStart(2, "0")}:${endM.toString().padStart(2, "0")}`;
-
     updateBlock.mutate({ id, date: newDate, start_time: newStartTime, end_time: newEndTime });
     toast.success("Blok verplaatst!");
   };
@@ -75,6 +95,24 @@ const Planner = () => {
 
   const dates = Object.keys(blocksByDate).sort();
 
+  const handleDragStart = (event: DragStartEvent) => {
+    const block = planBlocks.find((b) => b.id === event.active.id);
+    setActiveBlock(block || null);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveBlock(null);
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const draggedBlock = planBlocks.find((b) => b.id === active.id);
+    const overBlock = planBlocks.find((b) => b.id === over.id);
+    if (!draggedBlock || !overBlock) return;
+
+    // Move the dragged block to the position/date of the target block
+    moveBlock(draggedBlock.id, overBlock.date, overBlock.start_time.slice(0, 5));
+  };
+
   return (
     <div>
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -86,27 +124,48 @@ const Planner = () => {
       </div>
 
       {dates.length > 0 ? (
-        <div className="flex flex-col gap-6">
-          {dates.map((date) => (
-            <div key={date}>
-              <h2 className="mb-2 flex items-center gap-2 font-display text-sm font-semibold text-muted-foreground">
-                <CalendarDays size={14} />
-                {format(parseISO(date), "EEEE d MMMM", { locale: nl })}
-              </h2>
-              <div className="flex flex-col gap-2">
-                {blocksByDate[date].map((block) => (
-                  <TimelineBlock
-                    key={block.id}
-                    block={block}
-                    onToggle={toggleBlock}
-                    onMove={moveBlock}
-                    onTimerComplete={handleTimerComplete}
-                  />
-                ))}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="flex flex-col gap-6">
+            {dates.map((date) => (
+              <div key={date}>
+                <h2 className="mb-2 flex items-center gap-2 font-display text-sm font-semibold text-muted-foreground">
+                  <CalendarDays size={14} />
+                  {format(parseISO(date), "EEEE d MMMM", { locale: nl })}
+                </h2>
+                <SortableContext
+                  items={blocksByDate[date].map((b) => b.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="flex flex-col gap-2">
+                    {blocksByDate[date].map((block) => (
+                      <TimelineBlock
+                        key={block.id}
+                        block={block}
+                        onToggle={toggleBlock}
+                        onMove={moveBlock}
+                        onTimerComplete={handleTimerComplete}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+
+          <DragOverlay>
+            {activeBlock ? (
+              <div className="rounded-xl border bg-card p-3 shadow-lg opacity-80">
+                <span className="text-sm font-medium">{activeBlock.task_title}</span>
+                <span className="ml-2 text-xs text-muted-foreground">{activeBlock.subject} · {activeBlock.duration_minutes} min</span>
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
       ) : (
         <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed bg-card/50 py-16 text-center">
           <Wand2 size={40} className="mb-3 text-primary/40" />

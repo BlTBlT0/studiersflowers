@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { Check, Coffee, MoveHorizontal, Timer, Play, Square } from "lucide-react";
+import { Check, Coffee, GripVertical, MoveHorizontal, Play, Square } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import type { DbPlanBlock } from "@/hooks/useSupabaseData";
 
 interface TimelineBlockProps {
@@ -19,44 +21,45 @@ export function TimelineBlock({ block, onToggle, onMove, onTimerComplete }: Time
   const [newDate, setNewDate] = useState(block.date);
   const [newTime, setNewTime] = useState(block.start_time.slice(0, 5));
 
-  // Timer state
   const [timerRunning, setTimerRunning] = useState(false);
   const [timerStart, setTimerStart] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
 
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: block.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
   const startTimer = () => {
     setTimerRunning(true);
-    setTimerStart(Date.now());
-    const interval = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - Date.now() + (Date.now() - (timerStart || Date.now()))) / 1000));
-    }, 1000);
-    // Store interval id
-    (window as any).__sf_timer = interval;
-    // Recalculate with closure
     const start = Date.now();
-    clearInterval(interval);
-    const newInterval = setInterval(() => {
+    setTimerStart(start);
+    const interval = setInterval(() => {
       setElapsed(Math.floor((Date.now() - start) / 1000));
     }, 1000);
-    (window as any).__sf_timer = newInterval;
-    setTimerStart(start);
+    (window as any).__sf_timer = interval;
   };
 
   const stopTimer = () => {
     setTimerRunning(false);
     clearInterval((window as any).__sf_timer);
     const actualMinutes = Math.max(1, Math.round(elapsed / 60));
-    if (onTimerComplete) {
-      onTimerComplete(block, actualMinutes);
-    }
+    if (onTimerComplete) onTimerComplete(block, actualMinutes);
     setElapsed(0);
     setTimerStart(null);
   };
 
   const handleMove = () => {
-    if (onMove) {
-      onMove(block.id, newDate, newTime);
-    }
+    if (onMove) onMove(block.id, newDate, newTime);
     setMoveOpen(false);
   };
 
@@ -68,14 +71,28 @@ export function TimelineBlock({ block, onToggle, onMove, onTimerComplete }: Time
 
   return (
     <div
+      ref={setNodeRef}
+      style={style}
       className={cn(
         "flex items-center gap-3 rounded-xl border p-3 transition-all animate-fade-in",
         block.is_break
           ? "border-dashed border-accent/40 bg-accent/5"
           : "bg-card",
-        block.completed && !block.is_break && "opacity-50"
+        block.completed && !block.is_break && "opacity-50",
+        isDragging && "opacity-30 shadow-lg"
       )}
     >
+      {/* Drag handle */}
+      {!block.is_break && (
+        <button
+          {...attributes}
+          {...listeners}
+          className="shrink-0 cursor-grab touch-none rounded p-1 text-muted-foreground/40 hover:text-muted-foreground active:cursor-grabbing"
+        >
+          <GripVertical size={16} />
+        </button>
+      )}
+
       {/* Time column */}
       <div className="w-20 shrink-0 text-center">
         <div className="text-sm font-semibold text-foreground">{block.start_time.slice(0, 5)}</div>
@@ -111,28 +128,18 @@ export function TimelineBlock({ block, onToggle, onMove, onTimerComplete }: Time
       {/* Actions */}
       {!block.is_break && (
         <div className="flex shrink-0 items-center gap-1">
-          {/* Timer */}
           {!block.completed && (
             timerRunning ? (
-              <button
-                onClick={stopTimer}
-                className="rounded-md p-1.5 text-destructive hover:bg-destructive/10"
-                title="Stop timer"
-              >
+              <button onClick={stopTimer} className="rounded-md p-1.5 text-destructive hover:bg-destructive/10" title="Stop timer">
                 <Square size={14} />
               </button>
             ) : (
-              <button
-                onClick={startTimer}
-                className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                title="Start timer"
-              >
+              <button onClick={startTimer} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground" title="Start timer">
                 <Play size={14} />
               </button>
             )
           )}
 
-          {/* Move */}
           {onMove && !block.completed && (
             <Dialog open={moveOpen} onOpenChange={setMoveOpen}>
               <DialogTrigger asChild>
@@ -159,7 +166,6 @@ export function TimelineBlock({ block, onToggle, onMove, onTimerComplete }: Time
             </Dialog>
           )}
 
-          {/* Checkbox */}
           <button
             onClick={() => onToggle(block.id)}
             className={cn(
