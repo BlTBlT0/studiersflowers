@@ -122,6 +122,7 @@ export type Database = {
           due_date: string
           estimated_minutes: number
           id: string
+          is_daily_practice: boolean
           priority: string
           subject: string
           title: string
@@ -133,6 +134,7 @@ export type Database = {
           due_date: string
           estimated_minutes?: number
           id?: string
+          is_daily_practice?: boolean
           priority?: string
           subject: string
           title: string
@@ -144,6 +146,7 @@ export type Database = {
           due_date?: string
           estimated_minutes?: number
           id?: string
+          is_daily_practice?: boolean
           priority?: string
           subject?: string
           title?: string
