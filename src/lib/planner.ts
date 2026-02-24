@@ -114,7 +114,7 @@ export function generatePlan(
       if (dateCompare !== 0) return dateCompare;
       return (priorityOrder[b.priority] || 2) - (priorityOrder[a.priority] || 2);
     });
-...
+
   // Calculate total study needed for regular tasks
   const allChunks: TaskChunk[] = [];
   for (const task of incompleteTasks) {
