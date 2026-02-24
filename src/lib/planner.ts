@@ -176,11 +176,23 @@ export function generatePlan(
       const task = incompleteTasks.find(t => t.id === chunk.taskId);
       const deadline = task?.due_date || "9999-12-31";
 
-      // If deadline is before this day AND there are future days, skip to spread load
-      // BUT if deadline is today or past, we must schedule it now
+      // Deadline means: must be DONE BEFORE that date (not on that date)
+      // So if deadline <= today, it's overdue/due now -> schedule ASAP
+      // If deadline is in the future, we can spread the load
       if (deadline > dayInfo.dateStr && studyMinutesThisDay >= Math.floor(maxPerDay * 0.6)) {
-        // We've done enough for today, save non-urgent for later
         continue;
+      }
+      
+      // Skip tasks that can't be done anymore (deadline has passed = today or earlier)
+      // But still schedule them as "overdue" so user sees them
+      // Key: deadline is the day it must be handed in, so last work day is deadline - 1
+      // We filter eligible days: task must be scheduled on days BEFORE the deadline
+      if (dayInfo.dateStr >= deadline) {
+        // This day is on or after the deadline - too late to work on it
+        // Unless it's already overdue (deadline <= today), then schedule ASAP anyway
+        if (deadline > format(today, "yyyy-MM-dd")) {
+          continue; // Future deadline but this day is too late
+        }
       }
 
       // Find a slot to place this chunk
