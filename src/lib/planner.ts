@@ -146,12 +146,11 @@ export function generatePlan(
   const totalAvailable = daySlots.reduce((s, d) => s + d.totalMinutes, 0);
 
   // Target: spread evenly, but respect deadlines
-  // Max study per day = total / available days, but at least enough for due-today tasks
   const daysWithTime = daySlots.length;
   const targetPerDay = daysWithTime > 0 ? Math.ceil(totalStudyMinutes / daysWithTime) : 90;
-  // Hard cap: max 90 min study per day to keep it manageable
+  // Ensure we can fit all tasks: minimum 45 min/day, max 90 min/day
   const MAX_STUDY_PER_DAY = 90;
-  const maxPerDay = Math.min(Math.max(targetPerDay, 30), MAX_STUDY_PER_DAY);
+  const maxPerDay = Math.min(Math.max(targetPerDay, 45), MAX_STUDY_PER_DAY);
 
   const blocks: Omit<TablesInsert<"plan_blocks">, "user_id">[] = [];
   const remainingChunks = [...allChunks];
@@ -195,22 +194,18 @@ export function generatePlan(
       const deadline = task?.due_date || "9999-12-31";
 
       // Deadline means: must be DONE BEFORE that date (not on that date)
-      // So if deadline <= today, it's overdue/due now -> schedule ASAP
-      // If deadline is in the future, we can spread the load
-      if (deadline > dayInfo.dateStr && studyMinutesThisDay >= Math.floor(maxPerDay * 0.6)) {
+      // Task must be scheduled on days STRICTLY BEFORE the deadline
+      const todayStr = format(today, "yyyy-MM-dd");
+      const isOverdue = deadline <= todayStr; // deadline already passed or is today
+      
+      if (dayInfo.dateStr >= deadline && !isOverdue) {
+        // This day is on or after the deadline - too late to work on it
         continue;
       }
-      
-      // Skip tasks that can't be done anymore (deadline has passed = today or earlier)
-      // But still schedule them as "overdue" so user sees them
-      // Key: deadline is the day it must be handed in, so last work day is deadline - 1
-      // We filter eligible days: task must be scheduled on days BEFORE the deadline
-      if (dayInfo.dateStr >= deadline) {
-        // This day is on or after the deadline - too late to work on it
-        // Unless it's already overdue (deadline <= today), then schedule ASAP anyway
-        if (deadline > format(today, "yyyy-MM-dd")) {
-          continue; // Future deadline but this day is too late
-        }
+
+      // Spread load: if we've done enough for today, defer non-urgent tasks
+      if (!isOverdue && deadline > dayInfo.dateStr && studyMinutesThisDay >= Math.floor(maxPerDay * 0.6)) {
+        continue;
       }
 
       // Find a slot to place this chunk
