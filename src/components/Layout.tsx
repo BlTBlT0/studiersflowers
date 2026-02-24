@@ -66,7 +66,10 @@ export function Layout({ children }: { children: ReactNode }) {
         {/* Desktop sidebar */}
         <aside className="hidden w-64 shrink-0 md:block bg-sidebar text-sidebar-foreground">
           <div className="sticky top-0 flex h-screen flex-col p-4">
-            <h1 className="mb-8 font-display text-xl font-bold text-primary">📚 StudyFlow</h1>
+            <div className="mb-8 flex items-center gap-3">
+              <img src={logo} alt="StudyFlow" className="h-10 w-10 rounded-xl" />
+              <h1 className="font-display text-xl font-bold text-sidebar-foreground">StudyFlow</h1>
+            </div>
             <nav className="flex flex-1 flex-col gap-1">
               {navItems.map((item) => (
                 <Link
