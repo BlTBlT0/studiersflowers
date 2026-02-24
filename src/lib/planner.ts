@@ -151,18 +151,70 @@ export function generatePlan(
   const maxPerDay = Math.min(Math.max(targetPerDay, 30), MAX_STUDY_PER_DAY);
 
   const blocks: Omit<TablesInsert<"plan_blocks">, "user_id">[] = [];
-  let chunkIndex = 0;
+  const remainingChunks = [...allChunks];
 
+  // Schedule chunks respecting deadlines: for each day, pick chunks whose deadline >= this day
   for (const dayInfo of daySlots) {
-    if (chunkIndex >= allChunks.length) break;
+    if (remainingChunks.length === 0) break;
 
     let studyMinutesThisDay = 0;
     let studyMinutesSinceBreak = 0;
 
-    for (const slot of dayInfo.slots) {
-      let cursor = slot.start;
+    // Find chunks that MUST be done by today or soon (deadline pressure)
+    // and chunks that CAN be done today
+    const eligibleIndices: number[] = [];
+    for (let i = 0; i < remainingChunks.length; i++) {
+      eligibleIndices.push(i);
+    }
 
-      while (cursor < slot.end && chunkIndex < allChunks.length && studyMinutesThisDay < maxPerDay) {
+    // Sort eligible chunks: urgent first (closest deadline), then by priority
+    eligibleIndices.sort((a, b) => {
+      const chunkA = remainingChunks[a];
+      const chunkB = remainingChunks[b];
+      const taskA = incompleteTasks.find(t => t.id === chunkA.taskId);
+      const taskB = incompleteTasks.find(t => t.id === chunkB.taskId);
+      const deadlineA = taskA?.due_date || "9999-12-31";
+      const deadlineB = taskB?.due_date || "9999-12-31";
+      const dateCompare = deadlineA.localeCompare(deadlineB);
+      if (dateCompare !== 0) return dateCompare;
+      return (priorityOrder[taskB?.priority || "medium"] || 2) - (priorityOrder[taskA?.priority || "medium"] || 2);
+    });
+
+    // Only schedule chunks that have deadline >= today (don't skip past-deadline tasks, still schedule them ASAP)
+    // Prioritize chunks whose deadline is soon
+    const scheduledIndices: number[] = [];
+
+    for (const idx of eligibleIndices) {
+      if (studyMinutesThisDay >= maxPerDay) break;
+
+      const chunk = remainingChunks[idx];
+      const task = incompleteTasks.find(t => t.id === chunk.taskId);
+      const deadline = task?.due_date || "9999-12-31";
+
+      // If deadline is before this day AND there are future days, skip to spread load
+      // BUT if deadline is today or past, we must schedule it now
+      if (deadline > dayInfo.dateStr && studyMinutesThisDay >= Math.floor(maxPerDay * 0.6)) {
+        // We've done enough for today, save non-urgent for later
+        continue;
+      }
+
+      // Find a slot to place this chunk
+      let placed = false;
+      for (const slot of dayInfo.slots) {
+        if (placed) break;
+        // Calculate cursor based on already-placed blocks for this day
+        let cursor = slot.start;
+        for (const b of blocks) {
+          if (b.date === dayInfo.dateStr) {
+            const bEnd = timeToMinutes(b.end_time);
+            if (bEnd > cursor && timeToMinutes(b.start_time) < slot.end) {
+              cursor = Math.max(cursor, bEnd);
+            }
+          }
+        }
+
+        if (cursor >= slot.end) continue;
+
         // Insert break if needed
         if (studyMinutesSinceBreak >= 40) {
           const breakEnd = Math.min(cursor + 10, slot.end);
@@ -183,9 +235,8 @@ export function generatePlan(
           }
         }
 
-        const chunk = allChunks[chunkIndex];
         const available = Math.min(slot.end - cursor, maxPerDay - studyMinutesThisDay);
-        if (available < 10) break;
+        if (available < 10) continue;
 
         const duration = Math.min(chunk.minutes, available);
         blocks.push({
@@ -200,16 +251,21 @@ export function generatePlan(
           is_break: false,
         });
 
-        cursor += duration;
         studyMinutesThisDay += duration;
         studyMinutesSinceBreak += duration;
 
         if (duration >= chunk.minutes) {
-          chunkIndex++;
+          scheduledIndices.push(idx);
         } else {
-          allChunks[chunkIndex] = { ...chunk, minutes: chunk.minutes - duration };
+          remainingChunks[idx] = { ...chunk, minutes: chunk.minutes - duration };
         }
+        placed = true;
       }
+    }
+
+    // Remove scheduled chunks (in reverse order to preserve indices)
+    for (const idx of scheduledIndices.sort((a, b) => b - a)) {
+      remainingChunks.splice(idx, 1);
     }
   }
 
