@@ -64,7 +64,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
       <div className="flex">
         {/* Desktop sidebar */}
-        <aside className="hidden w-64 shrink-0 border-r bg-card md:block">
+        <aside className="hidden w-64 shrink-0 md:block bg-sidebar text-sidebar-foreground">
           <div className="sticky top-0 flex h-screen flex-col p-4">
             <h1 className="mb-8 font-display text-xl font-bold text-primary">📚 StudyFlow</h1>
             <nav className="flex flex-1 flex-col gap-1">
