@@ -103,34 +103,19 @@ export function generatePlan(
   const subjectAverages = getSubjectAverages(tracking);
 
   const priorityOrder: Record<string, number> = { high: 3, medium: 2, low: 1 };
-  const incompleteTasks = tasks
-    .filter((t) => !t.completed)
+  
+  // Separate daily practice tasks from regular tasks
+  const dailyPracticeTasks = tasks.filter((t) => !t.completed && t.is_daily_practice);
+  const regularTasks = tasks.filter((t) => !t.completed && !t.is_daily_practice);
+  
+  const incompleteTasks = regularTasks
     .sort((a, b) => {
       const dateCompare = a.due_date.localeCompare(b.due_date);
       if (dateCompare !== 0) return dateCompare;
       return (priorityOrder[b.priority] || 2) - (priorityOrder[a.priority] || 2);
     });
-
-  // Calculate total available minutes over 14 days
-  const MAX_DAYS = 14;
-  const daySlots: { date: Date; dateStr: string; slots: TimeSlot[]; totalMinutes: number }[] = [];
-  for (let i = 0; i < MAX_DAYS; i++) {
-    const d = addDays(today, i);
-    const dateStr = format(d, "yyyy-MM-dd");
-    let slots = getAvailableSlots(d, schoolEndTimes, bedtime, commuteMinutes, activities);
-
-    // For today, filter out time that has already passed
-    if (i === 0) {
-      slots = slots
-        .map((s) => ({ start: Math.max(s.start, currentTimeMinutes), end: s.end }))
-        .filter((s) => s.end > s.start);
-    }
-
-    const totalMinutes = slots.reduce((sum, s) => sum + (s.end - s.start), 0);
-    if (totalMinutes > 0) daySlots.push({ date: d, dateStr, slots, totalMinutes });
-  }
-
-  // Calculate total study needed
+...
+  // Calculate total study needed for regular tasks
   const allChunks: TaskChunk[] = [];
   for (const task of incompleteTasks) {
     const adjusted = subjectAverages[task.subject]
