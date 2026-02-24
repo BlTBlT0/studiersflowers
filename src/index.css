@@ -9,54 +9,54 @@
     --font-display: 'Space Grotesk', sans-serif;
     --font-body: 'DM Sans', sans-serif;
 
-    --background: 40 25% 97%;
-    --foreground: 220 20% 15%;
+    --background: 210 30% 97%;
+    --foreground: 215 25% 15%;
 
     --card: 0 0% 100%;
-    --card-foreground: 220 20% 15%;
+    --card-foreground: 215 25% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 20% 15%;
+    --popover-foreground: 215 25% 15%;
 
-    --primary: 172 60% 36%;
+    --primary: 210 85% 50%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 200 25% 93%;
-    --secondary-foreground: 220 20% 25%;
+    --secondary: 210 30% 93%;
+    --secondary-foreground: 215 25% 25%;
 
-    --muted: 40 15% 93%;
-    --muted-foreground: 220 10% 50%;
+    --muted: 210 15% 93%;
+    --muted-foreground: 215 10% 50%;
 
-    --accent: 35 92% 55%;
+    --accent: 90 60% 45%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 72% 55%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 15% 90%;
-    --input: 220 15% 90%;
-    --ring: 172 60% 36%;
+    --border: 210 15% 90%;
+    --input: 210 15% 90%;
+    --ring: 210 85% 50%;
 
     --radius: 0.75rem;
 
     --priority-high: 0 72% 55%;
     --priority-medium: 35 92% 55%;
-    --priority-low: 172 60% 36%;
+    --priority-low: 90 60% 45%;
 
     --subject-math: 250 65% 60%;
-    --subject-science: 172 60% 36%;
+    --subject-science: 90 60% 45%;
     --subject-english: 35 92% 55%;
     --subject-history: 15 75% 50%;
-    --subject-default: 220 15% 55%;
+    --subject-default: 210 15% 55%;
 
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 220 20% 15%;
-    --sidebar-primary: 172 60% 36%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 172 50% 95%;
-    --sidebar-accent-foreground: 172 60% 25%;
-    --sidebar-border: 220 15% 92%;
-    --sidebar-ring: 172 60% 36%;
+    --sidebar-background: 210 85% 48%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 0 0% 100%;
+    --sidebar-primary-foreground: 210 85% 50%;
+    --sidebar-accent: 210 80% 55%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 210 70% 44%;
+    --sidebar-ring: 0 0% 100%;
   }
 
   .dark {
