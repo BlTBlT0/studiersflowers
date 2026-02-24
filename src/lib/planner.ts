@@ -1,8 +1,9 @@
-import { Task, Activity, ScheduleSettings, PlanBlock, Weekday, WEEKDAYS } from "@/types";
-import { format, addDays, parseISO, isAfter, isBefore, startOfDay } from "date-fns";
+import { DbTask, DbActivity, DbPlanBlock, DbTimeTracking, getSubjectAverages } from "@/hooks/useSupabaseData";
+import { format, addDays, startOfDay } from "date-fns";
+import type { TablesInsert } from "@/integrations/supabase/types";
 
 function timeToMinutes(time: string): number {
-  const [h, m] = time.split(":").map(Number);
+  const [h, m] = time.slice(0, 5).split(":").map(Number);
   return h * 60 + m;
 }
 
@@ -12,34 +13,38 @@ function minutesToTime(mins: number): string {
   return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
 }
 
+type Weekday = "monday" | "tuesday" | "wednesday" | "thursday" | "friday";
+const WEEKDAYS: Weekday[] = ["monday", "tuesday", "wednesday", "thursday", "friday"];
+
 function getWeekday(date: Date): Weekday | null {
-  const day = date.getDay(); // 0=Sun, 1=Mon...
+  const day = date.getDay();
   if (day === 0 || day === 6) return null;
   return WEEKDAYS[day - 1];
 }
 
 interface TimeSlot {
-  start: number; // minutes since midnight
+  start: number;
   end: number;
 }
 
 function getAvailableSlots(
   date: Date,
-  schedule: ScheduleSettings,
-  activities: Activity[]
+  schoolEndTimes: Record<string, string>,
+  bedtime: string,
+  commuteMinutes: number,
+  activities: DbActivity[]
 ): TimeSlot[] {
   const weekday = getWeekday(date);
-  if (!weekday) return []; // weekend
+  if (!weekday) return [];
 
-  const schoolEnd = timeToMinutes(schedule.schoolEndTimes[weekday]) + (schedule.commuteMinutes || 0);
-  const bedtime = timeToMinutes(schedule.bedtime);
+  const schoolEnd = timeToMinutes(schoolEndTimes[weekday] || "15:30") + (commuteMinutes || 0);
+  const bed = timeToMinutes(bedtime || "21:30");
 
-  if (schoolEnd >= bedtime) return [];
+  if (schoolEnd >= bed) return [];
 
-  // Get activities for this weekday, sorted by start
   const dayActivities = activities
     .filter((a) => a.weekday === weekday)
-    .map((a) => ({ start: timeToMinutes(a.startTime), end: timeToMinutes(a.endTime) }))
+    .map((a) => ({ start: timeToMinutes(a.start_time), end: timeToMinutes(a.end_time) }))
     .sort((a, b) => a.start - b.start);
 
   const slots: TimeSlot[] = [];
@@ -47,13 +52,13 @@ function getAvailableSlots(
 
   for (const act of dayActivities) {
     if (act.start > cursor) {
-      slots.push({ start: cursor, end: Math.min(act.start, bedtime) });
+      slots.push({ start: cursor, end: Math.min(act.start, bed) });
     }
     cursor = Math.max(cursor, act.end);
   }
 
-  if (cursor < bedtime) {
-    slots.push({ start: cursor, end: bedtime });
+  if (cursor < bed) {
+    slots.push({ start: cursor, end: bed });
   }
 
   return slots;
@@ -66,15 +71,15 @@ interface TaskChunk {
   minutes: number;
 }
 
-function splitIntoChunks(task: Task): TaskChunk[] {
+function splitIntoChunks(task: DbTask, adjustedMinutes: number): TaskChunk[] {
   const chunks: TaskChunk[] = [];
-  let remaining = task.estimatedMinutes;
+  let remaining = adjustedMinutes;
 
   if (remaining <= 45) {
     chunks.push({ taskId: task.id, taskTitle: task.title, subject: task.subject, minutes: remaining });
   } else {
     while (remaining > 0) {
-      const chunk = remaining > 45 ? 35 : remaining; // 35 min chunks, last chunk gets remainder
+      const chunk = remaining > 45 ? 35 : remaining;
       chunks.push({ taskId: task.id, taskTitle: task.title, subject: task.subject, minutes: Math.min(chunk, 45) });
       remaining -= chunk;
     }
@@ -84,61 +89,83 @@ function splitIntoChunks(task: Task): TaskChunk[] {
 }
 
 export function generatePlan(
-  tasks: Task[],
-  activities: Activity[],
-  schedule: ScheduleSettings,
+  tasks: DbTask[],
+  activities: DbActivity[],
+  schoolEndTimes: Record<string, string>,
+  bedtime: string,
+  commuteMinutes: number,
+  tracking: DbTimeTracking[] = [],
   startDate?: Date
-): PlanBlock[] {
+): Omit<TablesInsert<"plan_blocks">, "user_id">[] {
   const start = startDate || new Date();
   const today = startOfDay(start);
+  const subjectAverages = getSubjectAverages(tracking);
 
-  // Get incomplete tasks sorted by due date asc, priority desc
-  const priorityOrder = { high: 3, medium: 2, low: 1 };
+  const priorityOrder: Record<string, number> = { high: 3, medium: 2, low: 1 };
   const incompleteTasks = tasks
     .filter((t) => !t.completed)
     .sort((a, b) => {
-      const dateCompare = a.dueDate.localeCompare(b.dueDate);
+      const dateCompare = a.due_date.localeCompare(b.due_date);
       if (dateCompare !== 0) return dateCompare;
-      return priorityOrder[b.priority] - priorityOrder[a.priority];
+      return (priorityOrder[b.priority] || 2) - (priorityOrder[a.priority] || 2);
     });
 
-  // Create all chunks
-  const allChunks: TaskChunk[] = [];
-  for (const task of incompleteTasks) {
-    allChunks.push(...splitIntoChunks(task));
+  // Calculate total available minutes over 14 days
+  const MAX_DAYS = 14;
+  const daySlots: { date: Date; dateStr: string; slots: TimeSlot[]; totalMinutes: number }[] = [];
+  for (let i = 0; i < MAX_DAYS; i++) {
+    const d = addDays(today, i);
+    const dateStr = format(d, "yyyy-MM-dd");
+    const slots = getAvailableSlots(d, schoolEndTimes, bedtime, commuteMinutes, activities);
+    const totalMinutes = slots.reduce((sum, s) => sum + (s.end - s.start), 0);
+    if (totalMinutes > 0) daySlots.push({ date: d, dateStr, slots, totalMinutes });
   }
 
-  const blocks: PlanBlock[] = [];
+  // Calculate total study needed
+  const allChunks: TaskChunk[] = [];
+  for (const task of incompleteTasks) {
+    const adjusted = subjectAverages[task.subject]
+      ? Math.round((subjectAverages[task.subject] / task.estimated_minutes) * task.estimated_minutes)
+      : task.estimated_minutes;
+    allChunks.push(...splitIntoChunks(task, Math.max(adjusted, task.estimated_minutes)));
+  }
+
+  const totalStudyMinutes = allChunks.reduce((s, c) => s + c.minutes, 0);
+  const totalAvailable = daySlots.reduce((s, d) => s + d.totalMinutes, 0);
+
+  // Target: spread evenly, but respect deadlines
+  // Max study per day = total / available days, but at least enough for due-today tasks
+  const daysWithTime = daySlots.length;
+  const targetPerDay = daysWithTime > 0 ? Math.ceil(totalStudyMinutes / daysWithTime) : 120;
+  const maxPerDay = Math.max(targetPerDay, 60); // at least 60 min per day
+
+  const blocks: Omit<TablesInsert<"plan_blocks">, "user_id">[] = [];
   let chunkIndex = 0;
-  let dayOffset = 0;
-  const MAX_DAYS = 14; // plan up to 2 weeks ahead
 
-  while (chunkIndex < allChunks.length && dayOffset < MAX_DAYS) {
-    const currentDate = addDays(today, dayOffset);
-    const dateStr = format(currentDate, "yyyy-MM-dd");
-    const slots = getAvailableSlots(currentDate, schedule, activities);
+  for (const dayInfo of daySlots) {
+    if (chunkIndex >= allChunks.length) break;
 
+    let studyMinutesThisDay = 0;
     let studyMinutesSinceBreak = 0;
 
-    for (const slot of slots) {
+    for (const slot of dayInfo.slots) {
       let cursor = slot.start;
 
-      while (cursor < slot.end && chunkIndex < allChunks.length) {
+      while (cursor < slot.end && chunkIndex < allChunks.length && studyMinutesThisDay < maxPerDay) {
         // Insert break if needed
         if (studyMinutesSinceBreak >= 40) {
           const breakEnd = Math.min(cursor + 10, slot.end);
           if (breakEnd > cursor) {
             blocks.push({
-              id: `break-${dateStr}-${cursor}`,
-              taskId: "break",
-              taskTitle: "Break 🧃",
+              task_id: null,
+              task_title: "Pauze 🧃",
               subject: "",
-              date: dateStr,
-              startTime: minutesToTime(cursor),
-              endTime: minutesToTime(breakEnd),
-              durationMinutes: breakEnd - cursor,
+              date: dayInfo.dateStr,
+              start_time: minutesToTime(cursor),
+              end_time: minutesToTime(breakEnd),
+              duration_minutes: breakEnd - cursor,
               completed: false,
-              isBreak: true,
+              is_break: true,
             });
             cursor = breakEnd;
             studyMinutesSinceBreak = 0;
@@ -146,23 +173,24 @@ export function generatePlan(
         }
 
         const chunk = allChunks[chunkIndex];
-        const available = slot.end - cursor;
-        if (available < 10) break; // not enough time for meaningful work
+        const available = Math.min(slot.end - cursor, maxPerDay - studyMinutesThisDay);
+        if (available < 10) break;
 
         const duration = Math.min(chunk.minutes, available);
         blocks.push({
-          id: `${chunk.taskId}-${dateStr}-${cursor}`,
-          taskId: chunk.taskId,
-          taskTitle: chunk.taskTitle,
+          task_id: chunk.taskId,
+          task_title: chunk.taskTitle,
           subject: chunk.subject,
-          date: dateStr,
-          startTime: minutesToTime(cursor),
-          endTime: minutesToTime(cursor + duration),
-          durationMinutes: duration,
+          date: dayInfo.dateStr,
+          start_time: minutesToTime(cursor),
+          end_time: minutesToTime(cursor + duration),
+          duration_minutes: duration,
           completed: false,
+          is_break: false,
         });
 
         cursor += duration;
+        studyMinutesThisDay += duration;
         studyMinutesSinceBreak += duration;
 
         if (duration >= chunk.minutes) {
@@ -172,23 +200,23 @@ export function generatePlan(
         }
       }
     }
-
-    dayOffset++;
   }
 
   return blocks;
 }
 
-export function getTodayBlocks(blocks: PlanBlock[]): PlanBlock[] {
+export function getTodayBlocks(blocks: DbPlanBlock[]): DbPlanBlock[] {
   const today = format(new Date(), "yyyy-MM-dd");
   return blocks.filter((b) => b.date === today);
 }
 
-export function getAvailableMinutes(
+export function getAvailableMinutesForDate(
   date: Date,
-  schedule: ScheduleSettings,
-  activities: Activity[]
+  schoolEndTimes: Record<string, string>,
+  bedtime: string,
+  commuteMinutes: number,
+  activities: DbActivity[]
 ): number {
-  const slots = getAvailableSlots(date, schedule, activities);
+  const slots = getAvailableSlots(date, schoolEndTimes, bedtime, commuteMinutes, activities);
   return slots.reduce((sum, s) => sum + (s.end - s.start), 0);
 }

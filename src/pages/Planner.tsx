@@ -1,5 +1,4 @@
-import { Task, Activity, ScheduleSettings, PlanBlock, DEFAULT_SCHEDULE } from "@/types";
-import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { useTasks, useActivities, useScheduleSettings, usePlanBlocks, usePlanBlockMutations, useTimeTracking, useTimeTrackingMutations, DbPlanBlock } from "@/hooks/useSupabaseData";
 import { generatePlan } from "@/lib/planner";
 import { TimelineBlock } from "@/components/TimelineBlock";
 import { Button } from "@/components/ui/button";
@@ -9,10 +8,19 @@ import { nl } from "date-fns/locale";
 import { toast } from "sonner";
 
 const Planner = () => {
-  const [tasks] = useLocalStorage<Task[]>("studyflow-tasks", []);
-  const [schedule] = useLocalStorage<ScheduleSettings>("studyflow-schedule", DEFAULT_SCHEDULE);
-  const [activities] = useLocalStorage<Activity[]>("studyflow-activities", []);
-  const [planBlocks, setPlanBlocks] = useLocalStorage<PlanBlock[]>("studyflow-plan", []);
+  const { data: tasks = [] } = useTasks();
+  const { data: activities = [] } = useActivities();
+  const { data: dbSettings } = useScheduleSettings();
+  const { data: planBlocks = [] } = usePlanBlocks();
+  const { savePlan, updateBlock } = usePlanBlockMutations();
+  const { data: tracking = [] } = useTimeTracking();
+  const { addTracking } = useTimeTrackingMutations();
+
+  const schoolEndTimes = (dbSettings?.school_end_times as Record<string, string>) || {
+    monday: "15:30", tuesday: "15:30", wednesday: "15:30", thursday: "15:30", friday: "15:30",
+  };
+  const bedtime = dbSettings?.bedtime?.slice(0, 5) || "21:30";
+  const commuteMinutes = dbSettings?.commute_minutes ?? 15;
 
   const handleGenerate = () => {
     const incompleteTasks = tasks.filter((t) => !t.completed);
@@ -20,19 +28,46 @@ const Planner = () => {
       toast.error("Geen openstaande taken om in te plannen!");
       return;
     }
-    const blocks = generatePlan(tasks, activities, schedule);
-    setPlanBlocks(blocks);
+    const blocks = generatePlan(tasks, activities, schoolEndTimes, bedtime, commuteMinutes, tracking);
+    savePlan.mutate(blocks);
     toast.success(`Plan gegenereerd met ${blocks.length} blokken!`);
   };
 
   const toggleBlock = (id: string) => {
-    setPlanBlocks((prev) =>
-      prev.map((b) => (b.id === id ? { ...b, completed: !b.completed } : b))
-    );
+    const block = planBlocks.find((b) => b.id === id);
+    if (block) {
+      updateBlock.mutate({ id, completed: !block.completed });
+    }
+  };
+
+  const moveBlock = (id: string, newDate: string, newStartTime: string) => {
+    const block = planBlocks.find((b) => b.id === id);
+    if (!block) return;
+
+    // Calculate new end time
+    const [h, m] = newStartTime.split(":").map(Number);
+    const startMins = h * 60 + m;
+    const endMins = startMins + block.duration_minutes;
+    const endH = Math.floor(endMins / 60);
+    const endM = endMins % 60;
+    const newEndTime = `${endH.toString().padStart(2, "0")}:${endM.toString().padStart(2, "0")}`;
+
+    updateBlock.mutate({ id, date: newDate, start_time: newStartTime, end_time: newEndTime });
+    toast.success("Blok verplaatst!");
+  };
+
+  const handleTimerComplete = (block: DbPlanBlock, actualMinutes: number) => {
+    addTracking.mutate({
+      task_id: block.task_id,
+      subject: block.subject,
+      estimated_minutes: block.duration_minutes,
+      actual_minutes: actualMinutes,
+    });
+    toast.success(`${actualMinutes} minuten geregistreerd voor ${block.subject}. StudyFlow leert hiervan!`);
   };
 
   // Group blocks by date
-  const blocksByDate = planBlocks.reduce<Record<string, PlanBlock[]>>((acc, block) => {
+  const blocksByDate = planBlocks.reduce<Record<string, DbPlanBlock[]>>((acc, block) => {
     if (!acc[block.date]) acc[block.date] = [];
     acc[block.date].push(block);
     return acc;
@@ -44,9 +79,9 @@ const Planner = () => {
     <div>
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="font-display text-2xl font-bold">Planner</h1>
-        <Button onClick={handleGenerate} className="gap-2">
+        <Button onClick={handleGenerate} className="gap-2" disabled={savePlan.isPending}>
           <Wand2 size={16} />
-          Plan genereren
+          {savePlan.isPending ? "Bezig..." : "Plan genereren"}
         </Button>
       </div>
 
@@ -60,7 +95,13 @@ const Planner = () => {
               </h2>
               <div className="flex flex-col gap-2">
                 {blocksByDate[date].map((block) => (
-                  <TimelineBlock key={block.id} block={block} onToggle={toggleBlock} />
+                  <TimelineBlock
+                    key={block.id}
+                    block={block}
+                    onToggle={toggleBlock}
+                    onMove={moveBlock}
+                    onTimerComplete={handleTimerComplete}
+                  />
                 ))}
               </div>
             </div>

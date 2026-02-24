@@ -1,15 +1,15 @@
-import { Task, Priority } from "@/types";
 import { Check, Pencil, Trash2, Clock, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, parseISO } from "date-fns";
 import { nl } from "date-fns/locale";
 import { TaskForm } from "./TaskForm";
+import type { DbTask } from "@/hooks/useSupabaseData";
 
 interface TaskCardProps {
-  task: Task;
+  task: DbTask;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
-  onEdit: (id: string, data: Omit<Task, "id" | "completed" | "createdAt">) => void;
+  onEdit: (id: string, data: { title: string; subject: string; due_date: string; estimated_minutes: number; priority: string }) => void;
 }
 
 export function TaskCard({ task, onToggle, onDelete, onEdit }: TaskCardProps) {
@@ -45,11 +45,11 @@ export function TaskCard({ task, onToggle, onDelete, onEdit }: TaskCardProps) {
           </span>
           <span className="flex items-center gap-1">
             <Clock size={12} />
-            {task.estimatedMinutes}m
+            {task.estimated_minutes}m
           </span>
           <span className="flex items-center gap-1">
             <Calendar size={12} />
-            {format(parseISO(task.dueDate), "d MMM", { locale: nl })}
+            {format(parseISO(task.due_date), "d MMM", { locale: nl })}
           </span>
         </div>
       </div>
