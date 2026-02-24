@@ -10,7 +10,7 @@ const Homework = () => {
   const { addTask, updateTask, deleteTask } = useTaskMutations();
   const [search, setSearch] = useState("");
 
-  const handleAdd = (data: { title: string; subject: string; due_date: string; estimated_minutes: number; priority: string }) => {
+  const handleAdd = (data: { title: string; subject: string; due_date: string; estimated_minutes: number; priority: string; is_daily_practice: boolean }) => {
     addTask.mutate(data);
   };
 
