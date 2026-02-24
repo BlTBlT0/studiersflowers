@@ -101,7 +101,17 @@ export function TaskForm({ onSave, initial, trigger }: TaskFormProps) {
             </div>
             <div>
               <Label htmlFor="minutes">Geschatte minuten</Label>
-              <Input id="minutes" type="number" min="5" max="480" value={estimatedMinutes} onChange={(e) => setEstimatedMinutes(e.target.value)} />
+              <Input id="minutes" type="number" min="5" max="480" value={unknownTime ? "" : estimatedMinutes} onChange={(e) => { setEstimatedMinutes(e.target.value); setUnknownTime(false); }} disabled={unknownTime} placeholder={unknownTime ? "Weet niet" : ""} />
+              <label className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                <Checkbox checked={unknownTime} onCheckedChange={(c) => { setUnknownTime(!!c); if (c) setEstimatedMinutes("30"); }} />
+                Weet niet
+              </label>
+            </div>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <Checkbox checked={isDailyPractice} onCheckedChange={(c) => setIsDailyPractice(!!c)} />
+            <span className="text-sm">Dagelijks oefenen (bijv. woordjes leren, 5 min/dag)</span>
+          </label>
             </div>
           </div>
           <div>
