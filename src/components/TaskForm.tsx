@@ -112,8 +112,6 @@ export function TaskForm({ onSave, initial, trigger }: TaskFormProps) {
             <Checkbox checked={isDailyPractice} onCheckedChange={(c) => setIsDailyPractice(!!c)} />
             <span className="text-sm">Dagelijks oefenen (bijv. woordjes leren, 5 min/dag)</span>
           </label>
-            </div>
-          </div>
           <div>
             <Label>Prioriteit</Label>
             <div className="mt-1 flex gap-2">
