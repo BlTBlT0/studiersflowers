@@ -97,6 +97,32 @@ const WeekCalendar = () => {
         Weekkalender
       </h1>
 
+      {/* Legenda */}
+      <div className="mb-4 flex flex-wrap gap-3">
+        {Object.entries(SUBJECT_COLORS).map(([subject, colorClass]) => {
+          const bgClass = colorClass.split(" ")[0];
+          const borderClass = colorClass.split(" ")[1];
+          return (
+            <div key={subject} className="flex items-center gap-1.5">
+              <div className={`h-3 w-3 rounded-sm border ${bgClass} ${borderClass}`} />
+              <span className="text-xs text-muted-foreground">{subject}</span>
+            </div>
+          );
+        })}
+        <div className="flex items-center gap-1.5">
+          <div className="h-3 w-3 rounded-sm border bg-primary/40 border-primary/70" />
+          <span className="text-xs text-muted-foreground">Overig</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="h-3 w-3 rounded-sm border bg-[hsl(210,30%,30%/0.5)] border-[hsl(210,30%,30%/0.85)]" />
+          <span className="text-xs text-muted-foreground">Activiteit</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="h-3 w-3 rounded-sm border bg-muted border-muted-foreground/20" />
+          <span className="text-xs text-muted-foreground">Pauze</span>
+        </div>
+      </div>
+
       <Card>
         <CardContent className="overflow-x-auto p-0">
           <div className="min-w-[700px]">
