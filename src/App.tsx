@@ -11,6 +11,7 @@ import Schedule from "./pages/Schedule";
 import Planner from "./pages/Planner";
 import Grades from "./pages/Grades";
 import Stats from "./pages/Stats";
+import WeekCalendar from "./pages/WeekCalendar";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -51,6 +52,7 @@ const App = () => (
                       <Route path="/planner" element={<Planner />} />
                       <Route path="/grades" element={<Grades />} />
                       <Route path="/stats" element={<Stats />} />
+                      <Route path="/week" element={<WeekCalendar />} />
                       <Route path="*" element={<NotFound />} />
                     </Routes>
                   </Layout>
