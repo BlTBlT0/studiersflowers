@@ -15,17 +15,17 @@ const WEEKDAY_MAP: Record<string, number> = {
 };
 
 const SUBJECT_COLORS: Record<string, string> = {
-  Wiskunde: "bg-[hsl(250,65%,60%/0.35)] border-[hsl(250,65%,60%/0.7)] text-[hsl(250,45%,25%)]",
-  Biologie: "bg-[hsl(90,60%,45%/0.35)] border-[hsl(90,60%,45%/0.7)] text-[hsl(90,50%,20%)]",
-  Engels: "bg-[hsl(35,92%,55%/0.35)] border-[hsl(35,92%,55%/0.7)] text-[hsl(35,70%,22%)]",
-  Geschiedenis: "bg-[hsl(15,75%,50%/0.35)] border-[hsl(15,75%,50%/0.7)] text-[hsl(15,60%,22%)]",
-  Nederlands: "bg-[hsl(210,85%,50%/0.35)] border-[hsl(210,85%,50%/0.7)] text-[hsl(210,70%,22%)]",
-  Frans: "bg-[hsl(330,60%,55%/0.35)] border-[hsl(330,60%,55%/0.7)] text-[hsl(330,50%,22%)]",
-  Aardrijkskunde: "bg-[hsl(180,50%,45%/0.35)] border-[hsl(180,50%,45%/0.7)] text-[hsl(180,50%,20%)]",
+  Wiskunde: "bg-[hsl(250,65%,60%/0.55)] border-[hsl(250,65%,60%/0.9)] text-[hsl(250,45%,20%)]",
+  Biologie: "bg-[hsl(90,60%,45%/0.55)] border-[hsl(90,60%,45%/0.9)] text-[hsl(90,50%,15%)]",
+  Engels: "bg-[hsl(35,92%,55%/0.55)] border-[hsl(35,92%,55%/0.9)] text-[hsl(35,70%,18%)]",
+  Geschiedenis: "bg-[hsl(15,75%,50%/0.55)] border-[hsl(15,75%,50%/0.9)] text-[hsl(15,60%,18%)]",
+  Nederlands: "bg-[hsl(210,85%,50%/0.55)] border-[hsl(210,85%,50%/0.9)] text-[hsl(210,70%,18%)]",
+  Frans: "bg-[hsl(330,60%,55%/0.55)] border-[hsl(330,60%,55%/0.9)] text-[hsl(330,50%,18%)]",
+  Aardrijkskunde: "bg-[hsl(180,50%,45%/0.55)] border-[hsl(180,50%,45%/0.9)] text-[hsl(180,50%,15%)]",
 };
 
-const DEFAULT_COLOR = "bg-primary/25 border-primary/50 text-[hsl(210,70%,22%)]";
-const ACTIVITY_COLOR = "bg-[hsl(210,30%,30%/0.25)] border-[hsl(210,30%,30%/0.6)] text-[hsl(210,20%,18%)]";
+const DEFAULT_COLOR = "bg-primary/40 border-primary/70 text-[hsl(210,70%,18%)]";
+const ACTIVITY_COLOR = "bg-[hsl(210,30%,30%/0.5)] border-[hsl(210,30%,30%/0.85)] text-[hsl(210,20%,15%)]";
 const BREAK_COLOR = "bg-muted border-muted-foreground/20 text-muted-foreground";
 
 function timeToMinutes(time: string) {
