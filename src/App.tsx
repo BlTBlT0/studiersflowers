@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import Homework from "./pages/Homework";
 import Schedule from "./pages/Schedule";
 import Planner from "./pages/Planner";
+import Grades from "./pages/Grades";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -47,6 +48,7 @@ const App = () => (
                       <Route path="/homework" element={<Homework />} />
                       <Route path="/schedule" element={<Schedule />} />
                       <Route path="/planner" element={<Planner />} />
+                      <Route path="/grades" element={<Grades />} />
                       <Route path="*" element={<NotFound />} />
                     </Routes>
                   </Layout>
