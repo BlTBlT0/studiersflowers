@@ -2,10 +2,10 @@ import { useMemo } from "react";
 import { usePlanBlocks, useActivities } from "@/hooks/useSupabaseData";
 import { Card, CardContent } from "@/components/ui/card";
 import { CalendarDays } from "lucide-react";
-import { format, startOfWeek, addDays, parseISO, isWithinInterval } from "date-fns";
+import { format, startOfWeek, addDays } from "date-fns";
 import { nl } from "date-fns/locale";
 
-const HOUR_HEIGHT = 56; // px per hour
+const HOUR_HEIGHT = 56;
 const START_HOUR = 8;
 const END_HOUR = 22;
 const HOURS = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => START_HOUR + i);
@@ -15,18 +15,28 @@ const WEEKDAY_MAP: Record<string, number> = {
 };
 
 const SUBJECT_COLORS: Record<string, string> = {
-  Wiskunde: "bg-[hsl(250,65%,60%/0.55)] border-[hsl(250,65%,60%/0.9)] text-[hsl(250,45%,20%)]",
-  Biologie: "bg-[hsl(90,60%,45%/0.55)] border-[hsl(90,60%,45%/0.9)] text-[hsl(90,50%,15%)]",
-  Engels: "bg-[hsl(35,92%,55%/0.55)] border-[hsl(35,92%,55%/0.9)] text-[hsl(35,70%,18%)]",
-  Geschiedenis: "bg-[hsl(15,75%,50%/0.55)] border-[hsl(15,75%,50%/0.9)] text-[hsl(15,60%,18%)]",
-  Nederlands: "bg-[hsl(210,85%,50%/0.55)] border-[hsl(210,85%,50%/0.9)] text-[hsl(210,70%,18%)]",
-  Frans: "bg-[hsl(330,60%,55%/0.55)] border-[hsl(330,60%,55%/0.9)] text-[hsl(330,50%,18%)]",
-  Aardrijkskunde: "bg-[hsl(180,50%,45%/0.55)] border-[hsl(180,50%,45%/0.9)] text-[hsl(180,50%,15%)]",
+  Wiskunde: "bg-[hsl(270,100%,65%/0.25)] border-[hsl(270,100%,65%)] text-[hsl(270,100%,80%)] shadow-[0_0_8px_hsl(270,100%,65%/0.4)]",
+  Biologie: "bg-[hsl(140,100%,50%/0.2)] border-[hsl(140,100%,50%)] text-[hsl(140,100%,75%)] shadow-[0_0_8px_hsl(140,100%,50%/0.4)]",
+  Engels: "bg-[hsl(45,100%,55%/0.2)] border-[hsl(45,100%,55%)] text-[hsl(45,100%,75%)] shadow-[0_0_8px_hsl(45,100%,55%/0.4)]",
+  Geschiedenis: "bg-[hsl(15,100%,55%/0.25)] border-[hsl(15,100%,55%)] text-[hsl(15,100%,78%)] shadow-[0_0_8px_hsl(15,100%,55%/0.4)]",
+  Nederlands: "bg-[hsl(200,100%,55%/0.2)] border-[hsl(200,100%,55%)] text-[hsl(200,100%,78%)] shadow-[0_0_8px_hsl(200,100%,55%/0.4)]",
+  Frans: "bg-[hsl(320,100%,60%/0.2)] border-[hsl(320,100%,60%)] text-[hsl(320,100%,80%)] shadow-[0_0_8px_hsl(320,100%,60%/0.4)]",
+  Aardrijkskunde: "bg-[hsl(175,100%,45%/0.2)] border-[hsl(175,100%,45%)] text-[hsl(175,100%,75%)] shadow-[0_0_8px_hsl(175,100%,45%/0.4)]",
 };
 
-const DEFAULT_COLOR = "bg-primary/40 border-primary/70 text-[hsl(210,70%,18%)]";
-const ACTIVITY_COLOR = "bg-[hsl(210,30%,30%/0.5)] border-[hsl(210,30%,30%/0.85)] text-[hsl(210,20%,15%)]";
-const BREAK_COLOR = "bg-muted border-muted-foreground/20 text-muted-foreground";
+const NEON_DOTS: Record<string, string> = {
+  Wiskunde: "bg-[hsl(270,100%,65%)] shadow-[0_0_6px_hsl(270,100%,65%)]",
+  Biologie: "bg-[hsl(140,100%,50%)] shadow-[0_0_6px_hsl(140,100%,50%)]",
+  Engels: "bg-[hsl(45,100%,55%)] shadow-[0_0_6px_hsl(45,100%,55%)]",
+  Geschiedenis: "bg-[hsl(15,100%,55%)] shadow-[0_0_6px_hsl(15,100%,55%)]",
+  Nederlands: "bg-[hsl(200,100%,55%)] shadow-[0_0_6px_hsl(200,100%,55%)]",
+  Frans: "bg-[hsl(320,100%,60%)] shadow-[0_0_6px_hsl(320,100%,60%)]",
+  Aardrijkskunde: "bg-[hsl(175,100%,45%)] shadow-[0_0_6px_hsl(175,100%,45%)]",
+};
+
+const DEFAULT_COLOR = "bg-[hsl(210,100%,60%/0.2)] border-[hsl(210,100%,60%)] text-[hsl(210,100%,78%)] shadow-[0_0_8px_hsl(210,100%,60%/0.4)]";
+const ACTIVITY_COLOR = "bg-[hsl(260,80%,70%/0.15)] border-[hsl(260,80%,70%/0.7)] text-[hsl(260,80%,82%)] shadow-[0_0_6px_hsl(260,80%,70%/0.3)]";
+const BREAK_COLOR = "bg-[hsl(0,0%,40%/0.15)] border-[hsl(0,0%,50%/0.5)] text-[hsl(0,0%,65%)]";
 
 function timeToMinutes(time: string) {
   const [h, m] = time.slice(0, 5).split(":").map(Number);
@@ -50,13 +60,11 @@ const WeekCalendar = () => {
   const weekStart = useMemo(() => startOfWeek(new Date(), { weekStartsOn: 1 }), []);
   const weekDates = useMemo(() => Array.from({ length: 5 }, (_, i) => addDays(weekStart, i)), [weekStart]);
 
-  // Build columns
   const columns = useMemo(() => {
     return weekDates.map((date, dayIndex) => {
       const dateStr = format(date, "yyyy-MM-dd");
       const blocks: Block[] = [];
 
-      // Plan blocks for this date
       for (const pb of planBlocks) {
         if (pb.date !== dateStr) continue;
         const colorClass = pb.is_break
@@ -73,7 +81,6 @@ const WeekCalendar = () => {
         });
       }
 
-      // Activities for this weekday
       const weekdayName = Object.keys(WEEKDAY_MAP).find((k) => WEEKDAY_MAP[k] === dayIndex);
       for (const act of activities) {
         if (act.weekday !== weekdayName) continue;
@@ -93,48 +100,46 @@ const WeekCalendar = () => {
   return (
     <div>
       <h1 className="mb-6 font-display text-2xl font-bold flex items-center gap-2">
-        <CalendarDays size={24} className="text-primary" />
-        Weekkalender
+        <CalendarDays size={24} className="text-[hsl(270,100%,70%)]" />
+        <span className="bg-gradient-to-r from-[hsl(270,100%,70%)] to-[hsl(200,100%,60%)] bg-clip-text text-transparent">
+          Weekkalender
+        </span>
       </h1>
 
       {/* Legenda */}
-      <div className="mb-4 flex flex-wrap gap-3">
-        {Object.entries(SUBJECT_COLORS).map(([subject, colorClass]) => {
-          const bgClass = colorClass.split(" ")[0];
-          const borderClass = colorClass.split(" ")[1];
-          return (
-            <div key={subject} className="flex items-center gap-1.5">
-              <div className={`h-3 w-3 rounded-sm border ${bgClass} ${borderClass}`} />
-              <span className="text-xs text-muted-foreground">{subject}</span>
-            </div>
-          );
-        })}
+      <div className="mb-4 flex flex-wrap gap-3 rounded-lg bg-[hsl(230,25%,12%)] px-4 py-2.5 border border-[hsl(230,20%,20%)]">
+        {Object.keys(SUBJECT_COLORS).map((subject) => (
+          <div key={subject} className="flex items-center gap-1.5">
+            <div className={`h-2.5 w-2.5 rounded-full ${NEON_DOTS[subject]}`} />
+            <span className="text-xs text-[hsl(230,15%,65%)]">{subject}</span>
+          </div>
+        ))}
         <div className="flex items-center gap-1.5">
-          <div className="h-3 w-3 rounded-sm border bg-primary/40 border-primary/70" />
-          <span className="text-xs text-muted-foreground">Overig</span>
+          <div className="h-2.5 w-2.5 rounded-full bg-[hsl(210,100%,60%)] shadow-[0_0_6px_hsl(210,100%,60%/0.6)]" />
+          <span className="text-xs text-[hsl(230,15%,65%)]">Overig</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="h-3 w-3 rounded-sm border bg-[hsl(210,30%,30%/0.5)] border-[hsl(210,30%,30%/0.85)]" />
-          <span className="text-xs text-muted-foreground">Activiteit</span>
+          <div className="h-2.5 w-2.5 rounded-full bg-[hsl(260,80%,70%)] shadow-[0_0_6px_hsl(260,80%,70%/0.6)]" />
+          <span className="text-xs text-[hsl(230,15%,65%)]">Activiteit</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="h-3 w-3 rounded-sm border bg-muted border-muted-foreground/20" />
-          <span className="text-xs text-muted-foreground">Pauze</span>
+          <div className="h-2.5 w-2.5 rounded-full bg-[hsl(0,0%,50%)]" />
+          <span className="text-xs text-[hsl(230,15%,65%)]">Pauze</span>
         </div>
       </div>
 
-      <Card>
+      <Card className="bg-[hsl(230,25%,10%)] border-[hsl(230,20%,18%)] shadow-[0_0_30px_hsl(270,100%,50%/0.08)]">
         <CardContent className="overflow-x-auto p-0">
           <div className="min-w-[700px]">
             {/* Header row */}
-            <div className="grid grid-cols-[60px_repeat(5,1fr)] border-b bg-muted/30">
+            <div className="grid grid-cols-[60px_repeat(5,1fr)] border-b border-[hsl(230,20%,18%)] bg-[hsl(230,25%,12%)]">
               <div className="p-2" />
               {weekDates.map((date) => (
-                <div key={date.toISOString()} className="border-l p-2 text-center">
-                  <div className="text-xs font-medium text-muted-foreground">
+                <div key={date.toISOString()} className="border-l border-[hsl(230,20%,18%)] p-2 text-center">
+                  <div className="text-xs font-medium text-[hsl(230,15%,55%)]">
                     {format(date, "EEE", { locale: nl })}
                   </div>
-                  <div className="font-display text-sm font-semibold">
+                  <div className="font-display text-sm font-semibold text-[hsl(230,15%,80%)]">
                     {format(date, "d MMM", { locale: nl })}
                   </div>
                 </div>
@@ -148,7 +153,7 @@ const WeekCalendar = () => {
                 {HOURS.map((hour) => (
                   <div
                     key={hour}
-                    className="absolute right-2 text-[11px] text-muted-foreground"
+                    className="absolute right-2 text-[11px] text-[hsl(230,15%,40%)]"
                     style={{ top: (hour - START_HOUR) * HOUR_HEIGHT - 7 }}
                   >
                     {hour}:00
@@ -157,13 +162,13 @@ const WeekCalendar = () => {
               </div>
 
               {/* Day columns */}
-              {columns.map((col, colIdx) => (
-                <div key={col.dateStr} className="relative border-l">
+              {columns.map((col) => (
+                <div key={col.dateStr} className="relative border-l border-[hsl(230,20%,15%)]">
                   {/* Hour lines */}
                   {HOURS.map((hour) => (
                     <div
                       key={hour}
-                      className="absolute left-0 right-0 border-t border-border/40"
+                      className="absolute left-0 right-0 border-t border-[hsl(230,20%,14%)]"
                       style={{ top: (hour - START_HOUR) * HOUR_HEIGHT }}
                     />
                   ))}
