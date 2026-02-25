@@ -41,6 +41,36 @@ export type Database = {
         }
         Relationships: []
       }
+      grades: {
+        Row: {
+          created_at: string
+          date: string
+          description: string | null
+          grade: number
+          id: string
+          subject: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          date?: string
+          description?: string | null
+          grade: number
+          id?: string
+          subject: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          description?: string | null
+          grade?: number
+          id?: string
+          subject?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       plan_blocks: {
         Row: {
           completed: boolean

@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, BookOpen, Calendar, Wand2, Menu, X, LogOut } from "lucide-react";
+import { LayoutDashboard, BookOpen, Calendar, Wand2, GraduationCap, Menu, X, LogOut } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -11,6 +11,7 @@ const navItems = [
   { to: "/homework", icon: BookOpen, label: "Huiswerk" },
   { to: "/schedule", icon: Calendar, label: "Rooster" },
   { to: "/planner", icon: Wand2, label: "Planner" },
+  { to: "/grades", icon: GraduationCap, label: "Cijfers" },
 ];
 
 export function Layout({ children }: { children: ReactNode }) {

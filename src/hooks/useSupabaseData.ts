@@ -219,6 +219,53 @@ export function useTimeTrackingMutations() {
   return { addTracking };
 }
 
+// ---- GRADES ----
+export type DbGrade = Tables<"grades">;
+
+export function useGrades() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["grades", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("grades")
+        .select("*")
+        .order("date", { ascending: false });
+      if (error) throw error;
+      return data as DbGrade[];
+    },
+    enabled: !!user,
+  });
+}
+
+export function useGradeMutations() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+
+  const addGrade = useMutation({
+    mutationFn: async (grade: Omit<TablesInsert<"grades">, "user_id">) => {
+      const { error } = await supabase.from("grades").insert({ ...grade, user_id: user!.id });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["grades"] });
+      toast.success("Cijfer opgeslagen");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const deleteGrade = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("grades").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["grades"] }),
+    onError: (e) => toast.error(e.message),
+  });
+
+  return { addGrade, deleteGrade };
+}
+
 // Helper: get average actual minutes per subject from tracking data
 export function getSubjectAverages(tracking: DbTimeTracking[]): Record<string, number> {
   const bySubject: Record<string, { total: number; count: number }> = {};
