@@ -53,6 +53,7 @@ export function TaskForm({ onSave, initial, trigger }: TaskFormProps) {
       estimated_minutes: unknownTime ? 30 : (parseInt(estimatedMinutes) || 30),
       priority,
       is_daily_practice: isDailyPractice,
+      practice_frequency: isDailyPractice ? practiceFrequency : 0,
     });
     setOpen(false);
     if (!initial) {
