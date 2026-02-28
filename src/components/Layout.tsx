@@ -1,7 +1,8 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, BookOpen, Calendar, Wand2, GraduationCap, BarChart3, CalendarDays, Menu, X, LogOut } from "lucide-react";
+import { LayoutDashboard, BookOpen, Calendar, Wand2, GraduationCap, BarChart3, CalendarDays, Menu, X, LogOut, Sun, Moon } from "lucide-react";
 import { useState } from "react";
+import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import logo from "@/assets/logo.png";
