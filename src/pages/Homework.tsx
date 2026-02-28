@@ -17,7 +17,7 @@ const Homework = () => {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
 
-  const handleAdd = (data: { title: string; subject: string; due_date: string; estimated_minutes: number; priority: string; is_daily_practice: boolean }) => {
+  const handleAdd = (data: { title: string; subject: string; due_date: string; estimated_minutes: number; priority: string; is_daily_practice: boolean; practice_frequency: number }) => {
     addTask.mutate(data);
   };
 
