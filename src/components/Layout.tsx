@@ -21,6 +21,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { signOut } = useAuth();
+  const { theme, setTheme } = useTheme();
 
   return (
     <div className="min-h-screen bg-background">
