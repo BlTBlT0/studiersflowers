@@ -31,9 +31,17 @@ export function Layout({ children }: { children: ReactNode }) {
           <img src={logo} alt="StudyFlow" className="h-8 w-8 rounded-lg" />
           <span className="font-display text-lg font-bold text-primary">StudyFlow</span>
         </div>
-        <button onClick={() => setMobileOpen(!mobileOpen)} className="text-foreground">
-          {mobileOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          >
+            {theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}
+          </button>
+          <button onClick={() => setMobileOpen(!mobileOpen)} className="text-foreground">
+            {mobileOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
+        </div>
       </header>
 
       {/* Mobile nav overlay */}
