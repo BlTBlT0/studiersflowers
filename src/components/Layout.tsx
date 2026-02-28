@@ -100,13 +100,22 @@ export function Layout({ children }: { children: ReactNode }) {
                 </Link>
               ))}
             </nav>
-            <button
-              onClick={signOut}
-              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-            >
-              <LogOut size={18} />
-              Uitloggen
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+              >
+                {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+                {theme === "dark" ? "Licht" : "Donker"}
+              </button>
+              <button
+                onClick={signOut}
+                className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+              >
+                <LogOut size={18} />
+                Uitloggen
+              </button>
+            </div>
           </div>
         </aside>
 
