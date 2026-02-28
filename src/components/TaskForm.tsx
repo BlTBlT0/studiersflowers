@@ -64,6 +64,7 @@ export function TaskForm({ onSave, initial, trigger }: TaskFormProps) {
       setUnknownTime(false);
       setPriority("medium");
       setIsDailyPractice(false);
+      setPracticeFrequency(0);
     }
   };
 
