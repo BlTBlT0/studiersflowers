@@ -153,6 +153,7 @@ export type Database = {
           estimated_minutes: number
           id: string
           is_daily_practice: boolean
+          practice_frequency: number
           priority: string
           subject: string
           title: string
@@ -165,6 +166,7 @@ export type Database = {
           estimated_minutes?: number
           id?: string
           is_daily_practice?: boolean
+          practice_frequency?: number
           priority?: string
           subject: string
           title: string
@@ -177,6 +179,7 @@ export type Database = {
           estimated_minutes?: number
           id?: string
           is_daily_practice?: boolean
+          practice_frequency?: number
           priority?: string
           subject?: string
           title?: string
