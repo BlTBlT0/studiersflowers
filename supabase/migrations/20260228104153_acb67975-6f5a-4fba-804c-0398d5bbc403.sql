@@ -1,0 +1,1 @@
+ALTER TABLE public.tasks ADD COLUMN practice_frequency integer NOT NULL DEFAULT 0;
