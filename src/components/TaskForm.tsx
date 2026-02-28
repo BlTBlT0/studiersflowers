@@ -110,8 +110,29 @@ export function TaskForm({ onSave, initial, trigger }: TaskFormProps) {
           </div>
           <label className="flex items-center gap-2 cursor-pointer">
             <Checkbox checked={isDailyPractice} onCheckedChange={(c) => setIsDailyPractice(!!c)} />
-            <span className="text-sm">Dagelijks oefenen (bijv. woordjes leren, 5 min/dag)</span>
+            <span className="text-sm">Dagelijks oefenen</span>
           </label>
+          {isDailyPractice && (
+            <div className="ml-6">
+              <Label>Minuten per dag</Label>
+              <div className="mt-1 flex gap-2">
+                {[5, 10, 15, 20, 30].map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setEstimatedMinutes(m.toString())}
+                    className={`rounded-full border px-3 py-1 text-xs font-medium transition-all ${
+                      parseInt(estimatedMinutes) === m
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-secondary text-secondary-foreground border-border opacity-70 hover:opacity-100"
+                    }`}
+                  >
+                    {m} min
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div>
             <Label>Prioriteit</Label>
             <div className="mt-1 flex gap-2">

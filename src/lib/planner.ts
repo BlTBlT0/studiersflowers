@@ -279,14 +279,15 @@ export function generatePlan(
     }
   }
 
-  // Schedule daily practice tasks: 5 min per day on each available day before deadline
+  // Schedule daily practice tasks: user-chosen duration per day on each available day before deadline
   for (const task of dailyPracticeTasks) {
     const deadlineStr = task.due_date;
+    const dailyDuration = task.estimated_minutes || 5;
     for (const dayInfo of daySlots) {
       // Must be scheduled BEFORE the deadline day
       if (dayInfo.dateStr >= deadlineStr) break;
 
-      // Find first available slot for a short 5-min block
+      // Find first available slot for the daily block
       for (const slot of dayInfo.slots) {
         let cursor = slot.start;
         for (const b of blocks) {
@@ -297,15 +298,15 @@ export function generatePlan(
             }
           }
         }
-        if (cursor + 5 <= slot.end) {
+        if (cursor + dailyDuration <= slot.end) {
           blocks.push({
             task_id: task.id,
             task_title: `${task.title} 📖`,
             subject: task.subject,
             date: dayInfo.dateStr,
             start_time: minutesToTime(cursor),
-            end_time: minutesToTime(cursor + 5),
-            duration_minutes: 5,
+            end_time: minutesToTime(cursor + dailyDuration),
+            duration_minutes: dailyDuration,
             completed: false,
             is_break: false,
           });
