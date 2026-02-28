@@ -1,7 +1,8 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, BookOpen, Calendar, Wand2, GraduationCap, BarChart3, CalendarDays, Menu, X, LogOut } from "lucide-react";
+import { LayoutDashboard, BookOpen, Calendar, Wand2, GraduationCap, BarChart3, CalendarDays, Menu, X, LogOut, Sun, Moon } from "lucide-react";
 import { useState } from "react";
+import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import logo from "@/assets/logo.png";
@@ -20,6 +21,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { signOut } = useAuth();
+  const { theme, setTheme } = useTheme();
 
   return (
     <div className="min-h-screen bg-background">
@@ -29,9 +31,17 @@ export function Layout({ children }: { children: ReactNode }) {
           <img src={logo} alt="StudyFlow" className="h-8 w-8 rounded-lg" />
           <span className="font-display text-lg font-bold text-primary">StudyFlow</span>
         </div>
-        <button onClick={() => setMobileOpen(!mobileOpen)} className="text-foreground">
-          {mobileOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          >
+            {theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}
+          </button>
+          <button onClick={() => setMobileOpen(!mobileOpen)} className="text-foreground">
+            {mobileOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
+        </div>
       </header>
 
       {/* Mobile nav overlay */}
@@ -90,13 +100,22 @@ export function Layout({ children }: { children: ReactNode }) {
                 </Link>
               ))}
             </nav>
-            <button
-              onClick={signOut}
-              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-            >
-              <LogOut size={18} />
-              Uitloggen
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+              >
+                {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+                {theme === "dark" ? "Licht" : "Donker"}
+              </button>
+              <button
+                onClick={signOut}
+                className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+              >
+                <LogOut size={18} />
+                Uitloggen
+              </button>
+            </div>
           </div>
         </aside>
 
