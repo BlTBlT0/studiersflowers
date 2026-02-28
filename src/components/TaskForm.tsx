@@ -41,6 +41,7 @@ export function TaskForm({ onSave, initial, trigger }: TaskFormProps) {
   const [unknownTime, setUnknownTime] = useState(initial?.estimated_minutes === 30 && !initial?.title);
   const [priority, setPriority] = useState<Priority>((initial?.priority as Priority) || "medium");
   const [isDailyPractice, setIsDailyPractice] = useState(initial?.is_daily_practice || false);
+  const [practiceFrequency, setPracticeFrequency] = useState(initial?.practice_frequency || 0); // 0 = elke dag
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
