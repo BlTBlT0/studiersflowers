@@ -117,23 +117,55 @@ export function TaskForm({ onSave, initial, trigger }: TaskFormProps) {
             <span className="text-sm">Dagelijks oefenen</span>
           </label>
           {isDailyPractice && (
-            <div className="ml-6">
-              <Label>Minuten per dag</Label>
-              <div className="mt-1 flex gap-2">
-                {[5, 10, 15, 20, 30].map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => setEstimatedMinutes(m.toString())}
-                    className={`rounded-full border px-3 py-1 text-xs font-medium transition-all ${
-                      parseInt(estimatedMinutes) === m
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-secondary text-secondary-foreground border-border opacity-70 hover:opacity-100"
-                    }`}
-                  >
-                    {m} min
-                  </button>
-                ))}
+            <div className="ml-6 flex flex-col gap-3">
+              <div>
+                <Label>Hoe vaak oefenen?</Label>
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {[
+                    { value: 0, label: "Elke dag" },
+                    { value: 2, label: "2×" },
+                    { value: 3, label: "3×" },
+                    { value: 4, label: "4×" },
+                    { value: 5, label: "5×" },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setPracticeFrequency(opt.value)}
+                      className={`rounded-full border px-3 py-1 text-xs font-medium transition-all ${
+                        practiceFrequency === opt.value
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-secondary text-secondary-foreground border-border opacity-70 hover:opacity-100"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                {practiceFrequency > 0 && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {practiceFrequency}× verspreid tot de deadline
+                  </p>
+                )}
+              </div>
+              <div>
+                <Label>Minuten per sessie</Label>
+                <div className="mt-1 flex gap-2">
+                  {[5, 10, 15, 20, 30].map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setEstimatedMinutes(m.toString())}
+                      className={`rounded-full border px-3 py-1 text-xs font-medium transition-all ${
+                        parseInt(estimatedMinutes) === m
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-secondary text-secondary-foreground border-border opacity-70 hover:opacity-100"
+                      }`}
+                    >
+                      {m} min
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           )}

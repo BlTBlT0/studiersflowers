@@ -279,15 +279,35 @@ export function generatePlan(
     }
   }
 
-  // Schedule daily practice tasks: user-chosen duration per day on each available day before deadline
+  // Schedule daily practice tasks with frequency support
   for (const task of dailyPracticeTasks) {
     const deadlineStr = task.due_date;
-    const dailyDuration = task.estimated_minutes || 5;
-    for (const dayInfo of daySlots) {
-      // Must be scheduled BEFORE the deadline day
-      if (dayInfo.dateStr >= deadlineStr) break;
+    const sessionDuration = task.estimated_minutes || 5;
+    const frequency = (task as any).practice_frequency || 0; // 0 = every day
 
-      // Find first available slot for the daily block
+    // Collect eligible days (before deadline)
+    const eligibleDays = daySlots.filter((d) => d.dateStr < deadlineStr);
+    if (eligibleDays.length === 0) continue;
+
+    // Determine which days to schedule on
+    let scheduleDays: typeof eligibleDays;
+    if (frequency === 0 || frequency >= eligibleDays.length) {
+      // Every day
+      scheduleDays = eligibleDays;
+    } else {
+      // Spread N sessions evenly across available days
+      scheduleDays = [];
+      const step = eligibleDays.length / frequency;
+      for (let i = 0; i < frequency; i++) {
+        const idx = Math.min(Math.round(i * step + step / 2), eligibleDays.length - 1);
+        if (!scheduleDays.includes(eligibleDays[idx])) {
+          scheduleDays.push(eligibleDays[idx]);
+        }
+      }
+    }
+
+    for (const dayInfo of scheduleDays) {
+      // Find first available slot for the practice block
       for (const slot of dayInfo.slots) {
         let cursor = slot.start;
         for (const b of blocks) {
@@ -298,19 +318,19 @@ export function generatePlan(
             }
           }
         }
-        if (cursor + dailyDuration <= slot.end) {
+        if (cursor + sessionDuration <= slot.end) {
           blocks.push({
             task_id: task.id,
             task_title: `${task.title} 📖`,
             subject: task.subject,
             date: dayInfo.dateStr,
             start_time: minutesToTime(cursor),
-            end_time: minutesToTime(cursor + dailyDuration),
-            duration_minutes: dailyDuration,
+            end_time: minutesToTime(cursor + sessionDuration),
+            duration_minutes: sessionDuration,
             completed: false,
             is_break: false,
           });
-          break; // Only one block per day for daily practice
+          break;
         }
       }
     }
