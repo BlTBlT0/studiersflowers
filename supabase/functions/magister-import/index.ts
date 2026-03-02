@@ -124,29 +124,39 @@ async function magisterLogin(
         found++;
       }
       
-      // Search for ALL .join patterns (various syntaxes)
-      const joinPatterns = ['.join("")', ".join('')", '.join("")', ".join('')"];
-      for (const jp of joinPatterns) {
-        let jIdx = 0;
-        while ((jIdx = js.indexOf(jp, jIdx)) !== -1) {
-          const ctx = js.substring(Math.max(0, jIdx - 300), jIdx + 15);
-          console.log(`join pattern at ${jIdx}:`, ctx.substring(ctx.length - 100));
-          // Try to find array before join
-          const arrMatch = ctx.match(/\[([^\]]*"[^\]]*)\]\.join/);
-          if (arrMatch) {
-            try {
-              const arr = JSON.parse(`[${arrMatch[1]}]`);
-              const candidate = arr.join("");
-              if (candidate && /^[a-f0-9]+$/.test(candidate) && candidate.length > 8) {
-                authCode = candidate;
-                console.log("Extracted authCode:", authCode);
-                break;
-              }
-            } catch {}
-          }
-          jIdx += jp.length;
+      // Find the authCode construction pattern: array of hex strings with index mapping
+      // Pattern: var a=["hex1","hex2",...],b=["idx1","idx2",...].map(fn).join("")
+      const authCodePattern = js.match(/var\s+(\w+)\s*=\s*\[((?:"[^"]*",?\s*)+)\][\s\S]{0,50}?\[([^\]]+)\]\.map\(\(?function\(\w+\)\{return\s+\1\[parseInt\(\w+\)\|\|0\]\}\)?\)\.join\(""\)/);
+      if (authCodePattern) {
+        try {
+          const hexArr = JSON.parse(`[${authCodePattern[2]}]`);
+          const idxArr = JSON.parse(`[${authCodePattern[3]}]`);
+          authCode = idxArr.map((i: string) => hexArr[parseInt(i) || 0]).join("");
+          console.log("Extracted authCode from indexed array:", authCode);
+        } catch (e) {
+          console.log("Failed to parse authCode pattern:", e);
         }
-        if (authCode) break;
+      }
+      
+      if (!authCode) {
+        // Broader search: find the pattern near "Yu" (which follows authCode assignment)
+        const yuIdx = js.indexOf("),r=Yu");
+        if (yuIdx > 0) {
+          const ctx = js.substring(Math.max(0, yuIdx - 500), yuIdx + 5);
+          console.log("Context before Yu:", ctx);
+          // Extract: a=["hex",...],["idx",...].map(...).join("")
+          const match = ctx.match(/(\w+)\s*=\s*\[((?:"[^"]*",?\s*)+)\].*?\[([^\]]+)\]\.map\(\(?function\(\w+\)\{return\s+\1\[parseInt\(\w+\)\|\|0\]\}\)?\)\.join\(""\)/);
+          if (match) {
+            try {
+              const hexArr = JSON.parse(`[${match[2]}]`);
+              const idxArr = JSON.parse(`[${match[3]}]`);
+              authCode = idxArr.map((i: string) => hexArr[parseInt(i) || 0]).join("");
+              console.log("Extracted authCode (Yu method):", authCode);
+            } catch (e) {
+              console.log("Failed to parse Yu pattern:", e);
+            }
+          }
+        }
       }
       
       // Try direct patterns
