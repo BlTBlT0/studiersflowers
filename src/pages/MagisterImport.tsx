@@ -1,27 +1,18 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
-  Upload,
+  ClipboardPaste,
   AlertTriangle,
   Loader2,
   CheckCircle2,
-  FileSpreadsheet,
   Trash2,
-  X,
+  Upload,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import Papa from "papaparse";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -32,44 +23,44 @@ import {
 } from "@/components/ui/table";
 
 const KNOWN_SUBJECTS: Record<string, string> = {
-  ak: "Aardrijkskunde",
-  bi: "Biologie",
-  en: "Engels",
-  fa: "Frans",
-  gr: "Grieks",
-  gs: "Geschiedenis",
-  ku: "Kunst",
+  ak: "Aardrijkskunde", aardrijkskunde: "Aardrijkskunde",
+  bi: "Biologie", biologie: "Biologie",
+  en: "Engels", engels: "Engels",
+  fa: "Frans", frans: "Frans",
+  "franse taal en literatuur": "Frans",
+  gr: "Grieks", grieks: "Grieks",
+  gs: "Geschiedenis", geschiedenis: "Geschiedenis",
+  ku: "Kunst", kunst: "Kunst", kunstonderwijs: "Kunst",
   lo: "Lichamelijke Opvoeding",
-  mu: "Muziek",
-  na: "Natuurkunde",
-  ne: "Nederlands",
-  nlt: "Natuur, Leven & Technologie",
-  sk: "Scheikunde",
-  wi: "Wiskunde",
-  wia: "Wiskunde A",
-  wib: "Wiskunde B",
-  wic: "Wiskunde C",
-  wid: "Wiskunde D",
-  ec: "Economie",
-  ma: "Maatschappijleer",
-  maw: "Maatschappijwetenschappen",
-  ckv: "CKV",
-  beco: "Bedrijfseconomie",
-  la: "Latijn",
-  du: "Duits",
-  sp: "Spaans",
-  in: "Informatica",
-  fil: "Filosofie",
-  te: "Tekenen",
-  ht: "Handvaardigheid",
-  txt: "Textiel",
+  mu: "Muziek", muziek: "Muziek",
+  na: "Natuurkunde", natuurkunde: "Natuurkunde",
+  ne: "Nederlands", nederlands: "Nederlands",
+  "nederlandse taal en literatuur": "Nederlands",
+  sk: "Scheikunde", scheikunde: "Scheikunde",
+  wi: "Wiskunde", wiskunde: "Wiskunde",
+  wia: "Wiskunde A", wib: "Wiskunde B", wic: "Wiskunde C", wid: "Wiskunde D",
+  ec: "Economie", economie: "Economie",
+  ma: "Maatschappijleer", maw: "Maatschappijwetenschappen",
+  ckv: "CKV", la: "Latijn", latijn: "Latijn",
+  du: "Duits", duits: "Duits", sp: "Spaans", spaans: "Spaans",
+  in: "Informatica", informatica: "Informatica",
+  fil: "Filosofie", filosofie: "Filosofie",
+  te: "Tekenen", ht: "Handvaardigheid", txt: "Textiel",
 };
 
 function normalizeSubject(raw: string): string {
-  const lower = raw.trim().toLowerCase();
+  // Clean up truncated names like "Nederlandse taal e..." or "Franse taal en liter..."
+  const cleaned = raw.replace(/\.{2,}$/, "").trim();
+  const lower = cleaned.toLowerCase();
+  
   if (KNOWN_SUBJECTS[lower]) return KNOWN_SUBJECTS[lower];
-  // Return as-is with capitalised first letter
-  return raw.trim().charAt(0).toUpperCase() + raw.trim().slice(1);
+  
+  // Partial match for truncated names
+  for (const [key, value] of Object.entries(KNOWN_SUBJECTS)) {
+    if (key.startsWith(lower) || lower.startsWith(key)) return value;
+  }
+  
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
 }
 
 interface ParsedGrade {
@@ -77,146 +68,90 @@ interface ParsedGrade {
   grade: number;
   description: string;
   date: string;
+  weight: string;
 }
 
-type ColumnMapping = {
-  subject: string;
-  grade: string;
-  description: string;
-  date: string;
-};
+function parsePastedData(text: string): ParsedGrade[] {
+  const lines = text.split("\n").filter((l) => l.trim());
+  const grades: ParsedGrade[] = [];
 
-const REQUIRED_FIELDS: (keyof ColumnMapping)[] = ["subject", "grade"];
+  for (const line of lines) {
+    // Split by tab (copy-paste from browser table uses tabs)
+    const cols = line.split("\t").map((c) => c.trim());
+    
+    // Expected: Vak | Datum invoer | Omschrijving | Resultaat | Weegfactor
+    // But also handle if header row is included
+    if (cols.length < 4) continue;
 
-const FIELD_LABELS: Record<keyof ColumnMapping, string> = {
-  subject: "Vak",
-  grade: "Cijfer",
-  description: "Omschrijving",
-  date: "Datum",
-};
+    // Skip header row
+    if (
+      cols[0].toLowerCase().includes("vak") &&
+      cols.some((c) => c.toLowerCase().includes("resultaat") || c.toLowerCase().includes("cijfer"))
+    ) continue;
 
-function autoDetectColumn(
-  headers: string[],
-  field: keyof ColumnMapping
-): string {
-  const patterns: Record<keyof ColumnMapping, RegExp[]> = {
-    subject: [/vak/i, /subject/i, /code/i, /vakcode/i],
-    grade: [/cijfer/i, /grade/i, /resultaat/i, /score/i, /waarde/i],
-    description: [/omschrijving/i, /desc/i, /toets/i, /kolom/i, /naam/i],
-    date: [/datum/i, /date/i, /ingevoerd/i],
-  };
-  for (const pattern of patterns[field]) {
-    const match = headers.find((h) => pattern.test(h));
-    if (match) return match;
+    // Try to find the grade value - could be in different positions
+    // Magister format: Vak, Datum, Omschrijving, Resultaat, Weegfactor
+    let subject = cols[0];
+    let dateStr = cols[1];
+    let description = cols[2];
+    let gradeStr = cols[3];
+    let weight = cols[4] || "1x";
+
+    // Parse grade (handle comma as decimal separator)
+    const gradeNum = parseFloat(gradeStr.replace(",", "."));
+    
+    // If this doesn't look like a grade, the result might be text (like "opmerking bij resultaat")
+    if (isNaN(gradeNum)) continue;
+    // Filter out non-numeric grades or out-of-range
+    if (gradeNum < 1 || gradeNum > 10) continue;
+    
+    // Skip 0x weight entries (comments, not actual grades)
+    if (weight === "0x") continue;
+
+    // Parse date (DD-MM-YYYY format from Magister)
+    let isoDate = new Date().toISOString().split("T")[0];
+    if (dateStr) {
+      const parts = dateStr.split("-");
+      if (parts.length === 3) {
+        const [d, m, y] = parts;
+        const attempt = new Date(`${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`);
+        if (!isNaN(attempt.getTime())) {
+          isoDate = attempt.toISOString().split("T")[0];
+        }
+      }
+    }
+
+    grades.push({
+      subject: normalizeSubject(subject),
+      grade: Math.round(gradeNum * 10) / 10,
+      description,
+      date: isoDate,
+      weight,
+    });
   }
-  return "";
+
+  return grades;
 }
 
 const MagisterImport = () => {
-  const [file, setFile] = useState<File | null>(null);
-  const [headers, setHeaders] = useState<string[]>([]);
-  const [rows, setRows] = useState<Record<string, string>[]>([]);
-  const [mapping, setMapping] = useState<ColumnMapping>({
-    subject: "",
-    grade: "",
-    description: "",
-    date: "",
-  });
+  const [pasteValue, setPasteValue] = useState("");
   const [parsedGrades, setParsedGrades] = useState<ParsedGrade[]>([]);
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<number | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
 
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    setFile(f);
-    setResult(null);
-    setParsedGrades([]);
-
-    Papa.parse(f, {
-      header: true,
-      skipEmptyLines: true,
-      encoding: "utf-8",
-      complete: (results) => {
-        const h = results.meta.fields || [];
-        const r = results.data as Record<string, string>[];
-        setHeaders(h);
-        setRows(r);
-
-        // Auto-detect column mappings
-        const auto: ColumnMapping = {
-          subject: autoDetectColumn(h, "subject"),
-          grade: autoDetectColumn(h, "grade"),
-          description: autoDetectColumn(h, "description"),
-          date: autoDetectColumn(h, "date"),
-        };
-        setMapping(auto);
-      },
-      error: () => {
-        toast.error("Kan het bestand niet lezen. Is het een geldig CSV-bestand?");
-      },
-    });
-  };
-
-  const clearFile = () => {
-    setFile(null);
-    setHeaders([]);
-    setRows([]);
-    setMapping({ subject: "", grade: "", description: "", date: "" });
-    setParsedGrades([]);
-    setResult(null);
-    if (fileRef.current) fileRef.current.value = "";
-  };
-
-  const handlePreview = () => {
-    if (!mapping.subject || !mapping.grade) {
-      toast.error("Selecteer minstens de kolommen voor Vak en Cijfer");
+  const handleParse = () => {
+    if (!pasteValue.trim()) {
+      toast.error("Plak eerst je cijfers in het tekstveld");
       return;
     }
-
-    const grades: ParsedGrade[] = [];
-    for (const row of rows) {
-      const rawGrade = row[mapping.grade]?.replace(",", ".").trim();
-      const num = parseFloat(rawGrade);
-      if (isNaN(num) || num < 1 || num > 10) continue;
-
-      const rawSubject = row[mapping.subject]?.trim();
-      if (!rawSubject) continue;
-
-      let date = new Date().toISOString().split("T")[0];
-      if (mapping.date && row[mapping.date]) {
-        // Try parsing various date formats
-        const raw = row[mapping.date].trim();
-        const parsed = new Date(raw);
-        if (!isNaN(parsed.getTime())) {
-          date = parsed.toISOString().split("T")[0];
-        } else {
-          // Try DD-MM-YYYY
-          const parts = raw.split(/[-/]/);
-          if (parts.length === 3) {
-            const [d, m, y] = parts;
-            const attempt = new Date(`${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`);
-            if (!isNaN(attempt.getTime())) date = attempt.toISOString().split("T")[0];
-          }
-        }
-      }
-
-      grades.push({
-        subject: normalizeSubject(rawSubject),
-        grade: Math.round(num * 10) / 10,
-        description: mapping.description ? (row[mapping.description]?.trim() || "") : "",
-        date,
-      });
-    }
-
+    const grades = parsePastedData(pasteValue);
     if (grades.length === 0) {
-      toast.error("Geen geldige cijfers gevonden. Controleer de kolomkoppeling.");
+      toast.error("Geen geldige cijfers gevonden. Heb je de tabel goed gekopieerd?");
       return;
     }
-
     setParsedGrades(grades);
+    setResult(null);
   };
 
   const handleImport = async () => {
@@ -235,7 +170,6 @@ const MagisterImport = () => {
         date: g.date,
       }));
 
-      // Insert in batches of 100
       for (let i = 0; i < gradeRows.length; i += 100) {
         const batch = gradeRows.slice(i, i + 100);
         const { error } = await supabase.from("grades").insert(batch);
@@ -246,6 +180,7 @@ const MagisterImport = () => {
       toast.success(`${parsedGrades.length} cijfer(s) geïmporteerd!`);
       qc.invalidateQueries({ queryKey: ["grades"] });
       setParsedGrades([]);
+      setPasteValue("");
     } catch (err: any) {
       toast.error(err.message || "Import mislukt");
     } finally {
@@ -262,7 +197,7 @@ const MagisterImport = () => {
       <div className="mb-6">
         <h1 className="font-display text-2xl font-bold">Cijfers Importeren</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Importeer je cijfers vanuit een CSV-bestand (export vanuit Magister)
+          Kopieer en plak je cijfers vanuit Magister
         </p>
       </div>
 
@@ -270,107 +205,46 @@ const MagisterImport = () => {
         <CardContent className="flex items-start gap-3 p-4">
           <AlertTriangle size={20} className="mt-0.5 shrink-0 text-amber-500" />
           <div className="text-sm">
-            <p className="font-medium text-amber-500">Hoe exporteer je cijfers uit Magister?</p>
+            <p className="font-medium text-amber-500">Zo werkt het</p>
             <ol className="mt-1 list-decimal pl-4 text-muted-foreground space-y-1">
-              <li>Open Magister in je browser en ga naar <strong>Cijfers → Cijferoverzicht</strong></li>
-              <li>Klik rechtsboven op het <strong>export/download</strong> icoon</li>
-              <li>Kies <strong>CSV</strong> of <strong>Excel</strong> als formaat</li>
-              <li>Upload het gedownloade bestand hieronder</li>
+              <li>Open Magister → <strong>Cijfers</strong> → <strong>Laatste cijfers</strong></li>
+              <li>Selecteer alle rijen in de tabel (klik op de eerste rij, dan Shift+klik op de laatste)</li>
+              <li>Kopieer met <strong>⌘+C</strong> (Mac) of <strong>Ctrl+C</strong> (Windows)</li>
+              <li>Plak hieronder met <strong>⌘+V</strong> of <strong>Ctrl+V</strong></li>
             </ol>
           </div>
         </CardContent>
       </Card>
 
-      {/* File upload */}
+      {/* Paste area */}
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle className="text-base">1. Bestand uploaden</CardTitle>
+          <CardTitle className="text-base flex items-center gap-2">
+            <ClipboardPaste size={18} />
+            Plak je cijfers
+          </CardTitle>
         </CardHeader>
-        <CardContent>
-          {!file ? (
-            <label
-              htmlFor="csv-upload"
-              className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/25 p-8 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors"
-            >
-              <Upload size={32} className="text-muted-foreground" />
-              <p className="text-sm font-medium">Klik om een CSV-bestand te selecteren</p>
-              <p className="text-xs text-muted-foreground">CSV-bestanden (.csv)</p>
-              <input
-                ref={fileRef}
-                id="csv-upload"
-                type="file"
-                accept=".csv"
-                className="hidden"
-                onChange={handleFile}
-              />
-            </label>
-          ) : (
-            <div className="flex items-center gap-3 rounded-lg border p-3">
-              <FileSpreadsheet size={20} className="text-primary" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{file.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {rows.length} rij(en) gevonden, {headers.length} kolom(men)
-                </p>
-              </div>
-              <Button variant="ghost" size="icon" onClick={clearFile}>
-                <X size={16} />
-              </Button>
-            </div>
-          )}
+        <CardContent className="flex flex-col gap-3">
+          <Textarea
+            placeholder={"Nederlandse taal e...\t02-03-2026\tBoekpitch\t7,8\t1x\nkunstonderwijs\t06-02-2026\tKoraal\t7,3\t1x\n..."}
+            value={pasteValue}
+            onChange={(e) => setPasteValue(e.target.value)}
+            rows={6}
+            className="font-mono text-xs"
+          />
+          <Button onClick={handleParse} disabled={!pasteValue.trim()}>
+            <ClipboardPaste size={16} className="mr-2" />
+            Cijfers herkennen
+          </Button>
         </CardContent>
       </Card>
-
-      {/* Column mapping */}
-      {headers.length > 0 && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-base">2. Kolommen koppelen</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {(Object.keys(FIELD_LABELS) as (keyof ColumnMapping)[]).map((field) => (
-              <div key={field}>
-                <Label className="mb-1.5 block text-sm">
-                  {FIELD_LABELS[field]}
-                  {REQUIRED_FIELDS.includes(field) && (
-                    <span className="text-destructive ml-1">*</span>
-                  )}
-                </Label>
-                <Select
-                  value={mapping[field]}
-                  onValueChange={(v) =>
-                    setMapping((prev) => ({ ...prev, [field]: v === "__none__" ? "" : v }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecteer kolom..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">— Niet gebruiken —</SelectItem>
-                    {headers.map((h) => (
-                      <SelectItem key={h} value={h}>
-                        {h}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ))}
-            <div className="sm:col-span-2">
-              <Button onClick={handlePreview} className="w-full">
-                Voorbeeld bekijken
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Preview */}
       {parsedGrades.length > 0 && (
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="text-base">
-              3. Controleer ({parsedGrades.length} cijfers)
+              Controleer ({parsedGrades.length} cijfers)
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -386,7 +260,7 @@ const MagisterImport = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {parsedGrades.slice(0, 100).map((g, i) => (
+                  {parsedGrades.map((g, i) => (
                     <TableRow key={i}>
                       <TableCell className="font-medium">{g.subject}</TableCell>
                       <TableCell>{g.grade}</TableCell>
@@ -411,11 +285,6 @@ const MagisterImport = () => {
                 </TableBody>
               </Table>
             </div>
-            {parsedGrades.length > 100 && (
-              <p className="text-xs text-muted-foreground mt-2">
-                Toont eerste 100 van {parsedGrades.length} cijfers
-              </p>
-            )}
 
             <Button
               onClick={handleImport}
