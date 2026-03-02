@@ -49,7 +49,17 @@ const Grades = () => {
   const filtered = filterSubject === "all" ? grades : grades.filter((g) => g.subject === filterSubject);
   const sortedFiltered = [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  if (isLoading) return <div className="py-16 text-center text-muted-foreground">Laden...</div>;
+  if (isLoading || finalLoading) return <div className="py-16 text-center text-muted-foreground">Laden...</div>;
+
+  // Build final grades by subject (deduplicate, keep latest)
+  const finalBySubject = new Map<string, { grade: number; description: string; date: string; id: string }>();
+  finalGrades.forEach((g) => {
+    const existing = finalBySubject.get(g.subject);
+    if (!existing || new Date(g.date) > new Date(existing.date)) {
+      finalBySubject.set(g.subject, { grade: Number(g.grade), description: g.description || "", date: g.date, id: g.id });
+    }
+  });
+  const sortedFinal = Array.from(finalBySubject.entries()).sort((a, b) => a[0].localeCompare(b[0]));
 
   return (
     <div>
