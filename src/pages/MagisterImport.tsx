@@ -407,21 +407,20 @@ const MagisterImport = () => {
         </Card>
       )}
 
-      {/* Summary of skipped calculated grades */}
-      {fileSummary.length > 0 && parsedGrades.length > 0 && (
+      {/* Final grades preview */}
+      {parsedFinalGrades.length > 0 && (
         <Card className="mb-6">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Overgeslagen (berekend)</CardTitle>
+            <CardTitle className="text-base">Eindcijfers ({parsedFinalGrades.length})</CardTitle>
             <p className="text-xs text-muted-foreground">
-              Eindcijfers en gemiddelden worden niet geïmporteerd
+              Deze worden apart opgeslagen en getoond op de Cijfers-pagina
             </p>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
-              {fileSummary.map((s, i) => (
-                <div key={i} className="rounded-md bg-muted px-2.5 py-1 text-xs">
-                  <span className="font-medium">{s.subject}</span>{" "}
-                  <span className="text-muted-foreground">{s.grade} · {s.type}</span>
+              {parsedFinalGrades.map((g, i) => (
+                <div key={i} className={`rounded-md px-2.5 py-1.5 text-xs font-medium ${g.grade >= 5.5 ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"}`}>
+                  {g.subject}: {g.grade}
                 </div>
               ))}
             </div>
