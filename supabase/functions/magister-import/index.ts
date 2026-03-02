@@ -358,7 +358,7 @@ Deno.serve(async (req) => {
       const homework = await fetchHomework(session);
       if (homework.length > 0) {
         const taskRows = homework.map((h) => ({
-          user_id: user.id,
+          user_id: userId,
           title: h.title.substring(0, 200),
           subject: h.subject,
           due_date: h.dueDate,
