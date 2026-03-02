@@ -208,12 +208,13 @@ const MagisterImport = () => {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const content = ev.target?.result as string;
-      const grades = parseStGradesFile(content);
+      const { grades, summary } = parseStGradesFile(content);
       if (grades.length === 0) {
         toast.error("Geen geldige cijfers gevonden in dit bestand");
         return;
       }
       setParsedGrades(grades);
+      setFileSummary(summary);
       setResult(null);
       toast.success(`${grades.length} cijfer(s) herkend uit bestand`);
     };
