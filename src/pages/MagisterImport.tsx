@@ -396,6 +396,28 @@ const MagisterImport = () => {
         </Card>
       )}
 
+      {/* Summary of skipped calculated grades */}
+      {fileSummary.length > 0 && parsedGrades.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Overgeslagen (berekend)</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Eindcijfers en gemiddelden worden niet geïmporteerd
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {fileSummary.map((s, i) => (
+                <div key={i} className="rounded-md bg-muted px-2.5 py-1 text-xs">
+                  <span className="font-medium">{s.subject}</span>{" "}
+                  <span className="text-muted-foreground">{s.grade} · {s.type}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Result */}
       {result !== null && (
         <Card className="border-primary/30 bg-primary/5">
