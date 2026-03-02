@@ -80,6 +80,8 @@ async function magisterLogin(
   // Extract sessionId from the final URL
   const finalUrl = new URL(initRes.url);
   const sessionId = finalUrl.searchParams.get("sessionId") || "";
+  console.log("Final URL:", initRes.url);
+  console.log("SessionId:", sessionId);
 
   // Read body to consume the response
   const mainHTML = await initRes.text();
