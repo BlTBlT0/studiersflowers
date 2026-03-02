@@ -95,6 +95,33 @@ const Grades = () => {
         </Card>
       </div>
 
+      {/* Eindcijfers */}
+      {sortedFinal.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Award size={16} className="text-primary" />
+              Eindcijfers
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+              {sortedFinal.map(([subj, data]) => (
+                <div
+                  key={subj}
+                  className={`rounded-lg p-3 text-center ${data.grade >= 5.5 ? "bg-primary/10" : "bg-destructive/10"}`}
+                >
+                  <p className="text-xs text-muted-foreground truncate">{subj}</p>
+                  <p className={`text-xl font-bold ${data.grade >= 5.5 ? "text-primary" : "text-destructive"}`}>
+                    {data.grade}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Bar chart of averages */}
       {averages.length > 0 && (
         <Card className="mb-6">
