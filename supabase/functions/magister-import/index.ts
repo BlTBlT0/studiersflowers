@@ -140,12 +140,17 @@ async function magisterLogin(
   }
 
   // 4. Submit challenges
-  await submitChallenge("current");
-  await submitChallenge("username", { name: "username", value: username });
+  const currentRes = await submitChallenge("current");
+  console.log("Challenge 'current' response:", JSON.stringify(currentRes));
+  
+  const usernameRes = await submitChallenge("username", { name: "username", value: username });
+  console.log("Challenge 'username' response:", JSON.stringify(usernameRes));
+  
   const passwordRes = await submitChallenge("password", {
     name: "password",
     value: password,
   });
+  console.log("Challenge 'password' response:", JSON.stringify(passwordRes));
 
   if (!passwordRes.redirectURL) {
     throw new Error(
