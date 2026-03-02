@@ -12,6 +12,7 @@ import Planner from "./pages/Planner";
 import Grades from "./pages/Grades";
 import Stats from "./pages/Stats";
 import WeekCalendar from "./pages/WeekCalendar";
+import MagisterImport from "./pages/MagisterImport";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
