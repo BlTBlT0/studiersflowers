@@ -204,15 +204,18 @@ const MagisterImport = () => {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const content = ev.target?.result as string;
-      const { grades, summary } = parseStGradesFile(content);
-      if (grades.length === 0) {
+      const { grades, finalGrades } = parseStGradesFile(content);
+      if (grades.length === 0 && finalGrades.length === 0) {
         toast.error("Geen geldige cijfers gevonden in dit bestand");
         return;
       }
       setParsedGrades(grades);
-      setFileSummary(summary);
+      setParsedFinalGrades(finalGrades);
       setResult(null);
-      toast.success(`${grades.length} cijfer(s) herkend uit bestand`);
+      const parts = [];
+      if (grades.length > 0) parts.push(`${grades.length} cijfer(s)`);
+      if (finalGrades.length > 0) parts.push(`${finalGrades.length} eindcijfer(s)`);
+      toast.success(`${parts.join(" en ")} herkend uit bestand`);
     };
     reader.readAsText(file);
     // Reset so same file can be selected again
