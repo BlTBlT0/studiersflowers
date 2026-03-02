@@ -112,12 +112,13 @@ function parseLine(line: string): ParsedGrade | null {
 }
 
 // --- .stgrades file parser ---
-function parseStGradesFile(jsonStr: string): ParsedGrade[] {
+function parseStGradesFile(jsonStr: string): { grades: ParsedGrade[]; summary: { subject: string; type: string; grade: number }[] } {
   try {
     const data = JSON.parse(jsonStr);
     const grades: ParsedGrade[] = [];
+    const summary: { subject: string; type: string; grade: number }[] = [];
 
-    if (!data.grades || !Array.isArray(data.grades)) return [];
+    if (!data.grades || !Array.isArray(data.grades)) return { grades: [], summary: [] };
 
     for (const g of data.grades) {
       if (!g.TeltMee) continue;
@@ -128,6 +129,24 @@ function parseStGradesFile(jsonStr: string): ParsedGrade[] {
 
       const subjectRaw = g.Vak?.Omschrijving || g.Vak?.Afkorting || "";
       if (!subjectRaw) continue;
+
+      const kolomSoort = g.CijferKolom?.KolomSoort;
+      const kolomOmschrijving = (g.CijferKolom?.KolomOmschrijving || "").toLowerCase();
+
+      // KolomSoort 2 = calculated (eindcijfer, voortschrijdend gemiddelde, etc.)
+      const isCalculated = kolomSoort === 2 ||
+        kolomOmschrijving.includes("eindcijfer") ||
+        kolomOmschrijving.includes("voortschrijdend") ||
+        kolomOmschrijving.includes("gemiddelde");
+
+      if (isCalculated) {
+        summary.push({
+          subject: normalizeSubject(subjectRaw),
+          type: g.CijferKolom?.KolomOmschrijving || g.CijferKolom?.KolomKop || "Berekend",
+          grade: Math.round(gradeNum * 10) / 10,
+        });
+        continue;
+      }
 
       const dateStr = g.DatumIngevoerd
         ? new Date(g.DatumIngevoerd).toISOString().split("T")[0]
@@ -143,9 +162,9 @@ function parseStGradesFile(jsonStr: string): ParsedGrade[] {
       });
     }
 
-    return grades;
+    return { grades, summary };
   } catch {
-    return [];
+    return { grades: [], summary: [] };
   }
 }
 
@@ -158,6 +177,7 @@ gs 6,7 Duo-toets Grieken en Romeinen`;
 const MagisterImport = () => {
   const [text, setText] = useState("");
   const [parsedGrades, setParsedGrades] = useState<ParsedGrade[]>([]);
+  const [fileSummary, setFileSummary] = useState<{ subject: string; type: string; grade: number }[]>([]);
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -188,12 +208,13 @@ const MagisterImport = () => {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const content = ev.target?.result as string;
-      const grades = parseStGradesFile(content);
+      const { grades, summary } = parseStGradesFile(content);
       if (grades.length === 0) {
         toast.error("Geen geldige cijfers gevonden in dit bestand");
         return;
       }
       setParsedGrades(grades);
+      setFileSummary(summary);
       setResult(null);
       toast.success(`${grades.length} cijfer(s) herkend uit bestand`);
     };
@@ -371,6 +392,28 @@ const MagisterImport = () => {
                 <><Upload size={16} className="mr-2" />{parsedGrades.length} cijfer(s) importeren</>
               )}
             </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Summary of skipped calculated grades */}
+      {fileSummary.length > 0 && parsedGrades.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Overgeslagen (berekend)</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Eindcijfers en gemiddelden worden niet geïmporteerd
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {fileSummary.map((s, i) => (
+                <div key={i} className="rounded-md bg-muted px-2.5 py-1 text-xs">
+                  <span className="font-medium">{s.subject}</span>{" "}
+                  <span className="text-muted-foreground">{s.grade} · {s.type}</span>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
       )}
