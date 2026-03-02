@@ -72,10 +72,21 @@ async function magisterLogin(
     nonce: defaultNonce,
   };
 
-  // 2. Init cookies - visit authorization endpoint
+  // 2. Init cookies - visit authorization endpoint, manually follow redirects to capture all cookies
   const authUrl = genUrl(endpoints.authorization_endpoint, queryParams);
-  const initRes = await fetch(authUrl, { redirect: "follow" });
-  jar.addFromHeaders(initRes.headers);
+  let currentUrl = authUrl;
+  let initRes: Response;
+  for (let i = 0; i < 10; i++) {
+    initRes = await fetch(currentUrl, { redirect: "manual" });
+    jar.addFromHeaders(initRes.headers);
+    const location = initRes.headers.get("location");
+    if (!location || initRes.status < 300 || initRes.status >= 400) {
+      // Read body on final response
+      break;
+    }
+    await initRes.text(); // consume body
+    currentUrl = location.startsWith("http") ? location : `https://accounts.magister.net${location}`;
+  }
 
   // Extract sessionId from the final URL
   const finalUrl = new URL(initRes.url);
