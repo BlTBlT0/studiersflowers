@@ -1,16 +1,12 @@
-import { useState } from "react";
 import { useGrades, useGradeMutations } from "@/hooks/useSupabaseData";
-import { SUBJECTS } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Trash2, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Trash2, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { format } from "date-fns";
 import { nl } from "date-fns/locale";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, CartesianGrid, Cell } from "recharts";
-import { toast } from "sonner";
+import { useState } from "react";
 
 const Grades = () => {
   const { data: grades = [], isLoading } = useGrades();
