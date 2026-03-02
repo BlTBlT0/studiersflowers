@@ -98,31 +98,54 @@ async function magisterLogin(
     const jsUrl = jsPath.startsWith("http") ? jsPath : `https://accounts.magister.net${jsPath.startsWith("/") ? "" : "/"}${jsPath}`;
     try {
       const js = await (await fetch(jsUrl)).text();
-      // Try multiple patterns to extract authCode
-      const patterns = [
-        /\[([^\]]*"[^\]]*)\]\.join\(""\)/,
-        /authCode\s*[:=]\s*"([^"]+)"/,
-        /authCode\s*[:=]\s*'([^']+)'/,
-        /"authCode"\s*:\s*"([^"]+)"/,
-      ];
-      for (const pattern of patterns) {
-        const codeMatch = js.match(pattern);
-        if (codeMatch) {
-          if (pattern === patterns[0]) {
-            // Array.join pattern
-            try {
-              const arr = JSON.parse(`[${codeMatch[1]}]`);
-              authCode = arr.join("");
-            } catch {}
-          } else {
-            authCode = codeMatch[1];
+      console.log("JS file length:", js.length);
+      
+      // Search for authCode-related patterns in the JS
+      // Log context around "authCode" mentions
+      const authCodeIdx = js.indexOf("authCode");
+      if (authCodeIdx >= 0) {
+        console.log("Found 'authCode' in JS at index", authCodeIdx, "context:", js.substring(Math.max(0, authCodeIdx - 50), authCodeIdx + 100));
+      }
+      
+      // Also search for .join("") patterns
+      const joinIdx = js.indexOf('.join("")');
+      if (joinIdx >= 0) {
+        // Find the start of the array
+        const searchStart = Math.max(0, joinIdx - 200);
+        const context = js.substring(searchStart, joinIdx + 10);
+        console.log("Found .join('') pattern, context:", context);
+        
+        // Extract the array
+        const arrayMatch = context.match(/\[([^\]]+)\]\.join\(""\)/);
+        if (arrayMatch) {
+          try {
+            const arr = JSON.parse(`[${arrayMatch[1]}]`);
+            authCode = arr.join("");
+            console.log("Extracted authCode from .join pattern, length:", authCode.length);
+          } catch (e) {
+            console.log("Failed to parse array:", e);
           }
-          if (authCode) {
-            console.log("Found authCode from JS:", jsUrl, "length:", authCode.length);
+        }
+      }
+      
+      // Try direct patterns
+      if (!authCode) {
+        const patterns = [
+          /authCode\s*[:=]\s*"([^"]+)"/,
+          /authCode\s*[:=]\s*'([^']+)'/,
+          /"authCode"\s*:\s*"([^"]+)"/,
+          /authCode\s*,\s*value\s*:\s*"([^"]+)"/,
+        ];
+        for (const pattern of patterns) {
+          const codeMatch = js.match(pattern);
+          if (codeMatch) {
+            authCode = codeMatch[1];
+            console.log("Found authCode via pattern:", pattern.source, "length:", authCode.length);
             break;
           }
         }
       }
+      
       if (authCode) break;
     } catch (e) {
       console.log("Failed to fetch/parse JS:", jsUrl, e);
