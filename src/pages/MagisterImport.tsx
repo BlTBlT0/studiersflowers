@@ -173,7 +173,7 @@ gs 6,7 Duo-toets Grieken en Romeinen`;
 const MagisterImport = () => {
   const [text, setText] = useState("");
   const [parsedGrades, setParsedGrades] = useState<ParsedGrade[]>([]);
-  const [fileSummary, setFileSummary] = useState<{ subject: string; type: string; grade: number }[]>([]);
+  const [parsedFinalGrades, setParsedFinalGrades] = useState<ParsedGrade[]>([]);
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
