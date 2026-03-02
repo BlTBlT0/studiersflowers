@@ -138,10 +138,12 @@ async function magisterLogin(
     const xsrfToken = jar.get("XSRF-TOKEN") || "";
 
     const postData: any = {
-      authCode,
       sessionId,
       returnUrl,
     };
+    if (authCode) {
+      postData.authCode = authCode;
+    }
     if (optionalData) {
       postData[optionalData.name] = optionalData.value;
     }
