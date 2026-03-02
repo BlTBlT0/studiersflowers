@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,6 +8,7 @@ import {
   Trash2,
   Upload,
   Lightbulb,
+  FileUp,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -20,28 +21,36 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const KNOWN_SUBJECTS: Record<string, string> = {
   ak: "Aardrijkskunde", aard: "Aardrijkskunde", aardrijkskunde: "Aardrijkskunde",
-  bi: "Biologie", bio: "Biologie", biologie: "Biologie",
-  en: "Engels", eng: "Engels", engels: "Engels",
-  fa: "Frans", fra: "Frans", frans: "Frans",
+  bi: "Biologie", bio: "Biologie", biologie: "Biologie", biol: "Biologie",
+  en: "Engels", eng: "Engels", engels: "Engels", entl: "Engels",
+  "engelse taal en literatuur": "Engels",
+  fa: "Frans", fra: "Frans", frans: "Frans", fatl: "Frans",
+  "franse taal en literatuur": "Frans",
   gr: "Grieks", grieks: "Grieks",
   gs: "Geschiedenis", gesch: "Geschiedenis", geschiedenis: "Geschiedenis",
   ku: "Kunst", kunst: "Kunst",
   lo: "Lichamelijke Opvoeding", gym: "Lichamelijke Opvoeding",
+  "lichamelijke opvoeding": "Lichamelijke Opvoeding",
   mu: "Muziek", muziek: "Muziek",
-  na: "Natuurkunde", nat: "Natuurkunde", natuurkunde: "Natuurkunde",
-  ne: "Nederlands", ned: "Nederlands", nederlands: "Nederlands",
+  na: "Natuurkunde", nat: "Natuurkunde", natuurkunde: "Natuurkunde", nask: "Natuurkunde",
+  ne: "Nederlands", ned: "Nederlands", nederlands: "Nederlands", netl: "Nederlands",
+  "nederlandse taal en literatuur": "Nederlands",
   sk: "Scheikunde", schei: "Scheikunde", scheikunde: "Scheikunde",
-  wi: "Wiskunde", wis: "Wiskunde", wiskunde: "Wiskunde",
+  wi: "Wiskunde", wis: "Wiskunde", wiskunde: "Wiskunde", wisA: "Wiskunde A", wisB: "Wiskunde B",
   ec: "Economie", eco: "Economie", economie: "Economie",
   ma: "Maatschappijleer", maw: "Maatschappijwetenschappen",
   ckv: "CKV", la: "Latijn", latijn: "Latijn",
-  du: "Duits", duits: "Duits", sp: "Spaans", spaans: "Spaans",
+  du: "Duits", duits: "Duits", dutl: "Duits",
+  "duitse taal en literatuur": "Duits",
+  sp: "Spaans", spaans: "Spaans",
   in: "Informatica", info: "Informatica", informatica: "Informatica",
   fil: "Filosofie", filosofie: "Filosofie",
   te: "Tekenen", ht: "Handvaardigheid",
+  bv: "Beeldende Vorming", "beeldende vorming": "Beeldende Vorming",
 };
 
 function normalizeSubject(raw: string): string {
@@ -57,11 +66,11 @@ interface ParsedGrade {
   date: string;
 }
 
+// --- Text line parser ---
 function parseLine(line: string): ParsedGrade | null {
   const trimmed = line.trim();
   if (!trimmed) return null;
 
-  // Try to find a date pattern (DD-MM-YYYY or YYYY-MM-DD) anywhere in the line
   let date = new Date().toISOString().split("T")[0];
   let remaining = trimmed;
 
@@ -82,14 +91,12 @@ function parseLine(line: string): ParsedGrade | null {
     }
   }
 
-  // Find the grade number (decimal with . or ,)
   const gradeMatch = remaining.match(/\b(\d{1,2}[.,]\d{1,2}|\d{1,2})\b/);
   if (!gradeMatch) return null;
 
   const gradeNum = parseFloat(gradeMatch[1].replace(",", "."));
   if (isNaN(gradeNum) || gradeNum < 1 || gradeNum > 10) return null;
 
-  // Everything before the grade = subject, everything after = description
   const gradeIdx = remaining.indexOf(gradeMatch[0]);
   const subject = remaining.substring(0, gradeIdx).trim();
   const description = remaining.substring(gradeIdx + gradeMatch[0].length).trim();
@@ -104,6 +111,44 @@ function parseLine(line: string): ParsedGrade | null {
   };
 }
 
+// --- .stgrades file parser ---
+function parseStGradesFile(jsonStr: string): ParsedGrade[] {
+  try {
+    const data = JSON.parse(jsonStr);
+    const grades: ParsedGrade[] = [];
+
+    if (!data.grades || !Array.isArray(data.grades)) return [];
+
+    for (const g of data.grades) {
+      if (!g.TeltMee) continue;
+
+      const gradeStr = g.CijferStr?.replace(",", ".");
+      const gradeNum = parseFloat(gradeStr);
+      if (isNaN(gradeNum) || gradeNum < 1 || gradeNum > 10) continue;
+
+      const subjectRaw = g.Vak?.Omschrijving || g.Vak?.Afkorting || "";
+      if (!subjectRaw) continue;
+
+      const dateStr = g.DatumIngevoerd
+        ? new Date(g.DatumIngevoerd).toISOString().split("T")[0]
+        : new Date().toISOString().split("T")[0];
+
+      const description = g.CijferKolom?.KolomOmschrijving || g.CijferKolom?.KolomKop || "";
+
+      grades.push({
+        subject: normalizeSubject(subjectRaw),
+        grade: Math.round(gradeNum * 10) / 10,
+        description,
+        date: dateStr,
+      });
+    }
+
+    return grades;
+  } catch {
+    return [];
+  }
+}
+
 const EXAMPLE = `wi 7,2 Poduo
 ne 7,8 Boekpitch
 kunst 8,0 Kleurensplash
@@ -115,6 +160,7 @@ const MagisterImport = () => {
   const [parsedGrades, setParsedGrades] = useState<ParsedGrade[]>([]);
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
 
   const handleParse = () => {
@@ -133,6 +179,27 @@ const MagisterImport = () => {
     }
     setParsedGrades(grades);
     setResult(null);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const content = ev.target?.result as string;
+      const grades = parseStGradesFile(content);
+      if (grades.length === 0) {
+        toast.error("Geen geldige cijfers gevonden in dit bestand");
+        return;
+      }
+      setParsedGrades(grades);
+      setResult(null);
+      toast.success(`${grades.length} cijfer(s) herkend uit bestand`);
+    };
+    reader.readAsText(file);
+    // Reset so same file can be selected again
+    e.target.value = "";
   };
 
   const handleImport = async () => {
@@ -184,40 +251,76 @@ const MagisterImport = () => {
       <div className="mb-6">
         <h1 className="font-display text-2xl font-bold">Cijfer Import</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Typ je cijfers snel in — één per regel
+          Importeer cijfers via tekst of een backup-bestand
         </p>
       </div>
 
-      {/* Input */}
-      <Card className="mb-6">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Typ je cijfers</CardTitle>
-          <p className="text-xs text-muted-foreground">
-            Formaat per regel: <span className="font-mono bg-muted px-1 py-0.5 rounded">vak cijfer omschrijving</span>
-            {" "}— datum optioneel (DD-MM-YYYY)
-          </p>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          <Textarea
-            placeholder={"wi 7,2 Poduo\nne 7,8 Boekpitch\nkunst 8,0 Kleurensplash 26-01-2026"}
-            value={text}
-            onChange={(e) => { setText(e.target.value); setParsedGrades([]); setResult(null); }}
-            rows={8}
-            className="font-mono text-sm leading-relaxed"
-          />
-          <div className="flex gap-2">
-            <Button onClick={handleParse} disabled={!text.trim()} className="flex-1">
-              Cijfers herkennen
-            </Button>
-            <Button variant="outline" size="icon" onClick={fillExample} title="Vul voorbeeld in">
-              <Lightbulb size={16} />
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            💡 Afkortingen werken: <span className="font-mono">wi</span> = Wiskunde, <span className="font-mono">ne</span> = Nederlands, <span className="font-mono">en</span> = Engels, <span className="font-mono">ak</span> = Aardrijkskunde, etc.
-          </p>
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="text" className="mb-6">
+        <TabsList className="w-full">
+          <TabsTrigger value="text" className="flex-1">Tekst invoer</TabsTrigger>
+          <TabsTrigger value="file" className="flex-1">Bestand uploaden</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="text">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Typ je cijfers</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Formaat per regel: <span className="font-mono bg-muted px-1 py-0.5 rounded">vak cijfer omschrijving</span>
+                {" "}— datum optioneel (DD-MM-YYYY)
+              </p>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              <Textarea
+                placeholder={"wi 7,2 Poduo\nne 7,8 Boekpitch\nkunst 8,0 Kleurensplash 26-01-2026"}
+                value={text}
+                onChange={(e) => { setText(e.target.value); setParsedGrades([]); setResult(null); }}
+                rows={8}
+                className="font-mono text-sm leading-relaxed"
+              />
+              <div className="flex gap-2">
+                <Button onClick={handleParse} disabled={!text.trim()} className="flex-1">
+                  Cijfers herkennen
+                </Button>
+                <Button variant="outline" size="icon" onClick={fillExample} title="Vul voorbeeld in">
+                  <Lightbulb size={16} />
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                💡 Afkortingen werken: <span className="font-mono">wi</span> = Wiskunde, <span className="font-mono">ne</span> = Nederlands, <span className="font-mono">en</span> = Engels, <span className="font-mono">ak</span> = Aardrijkskunde, etc.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="file">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Upload .stgrades bestand</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Exporteer je cijfers vanuit de Magister-app als backup en upload het <span className="font-mono bg-muted px-1 py-0.5 rounded">.stgrades</span> bestand hier
+              </p>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".stgrades,.json"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+              <Button
+                variant="outline"
+                className="h-24 border-dashed flex flex-col gap-2"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <FileUp size={24} className="text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Klik om een .stgrades bestand te selecteren</span>
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Preview */}
       {parsedGrades.length > 0 && (
