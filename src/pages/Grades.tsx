@@ -73,28 +73,8 @@ const Grades = () => {
 
   return (
     <div>
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-6">
         <h1 className="font-display text-2xl font-bold">Cijfers</h1>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm"><Plus size={16} className="mr-1" /> Cijfer toevoegen</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Nieuw cijfer</DialogTitle></DialogHeader>
-            <div className="flex flex-col gap-3">
-              <Select value={subject} onValueChange={setSubject}>
-                <SelectTrigger><SelectValue placeholder="Vak" /></SelectTrigger>
-                <SelectContent>
-                  {SUBJECTS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Input type="number" step="0.1" min="1" max="10" placeholder="Cijfer (1-10)" value={grade} onChange={(e) => setGrade(e.target.value)} />
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-              <Input placeholder="Omschrijving (optioneel)" value={description} onChange={(e) => setDescription(e.target.value)} />
-              <Button onClick={handleAdd} disabled={addGrade.isPending}>Opslaan</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
       </div>
 
       {/* Overview cards */}

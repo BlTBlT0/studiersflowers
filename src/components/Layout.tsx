@@ -15,7 +15,7 @@ const navItems = [
   { to: "/grades", icon: GraduationCap, label: "Cijfers" },
   { to: "/stats", icon: BarChart3, label: "Statistieken" },
   { to: "/week", icon: CalendarDays, label: "Weekkalender" },
-  { to: "/magister", icon: Download, label: "Magister Import" },
+  { to: "/magister", icon: Download, label: "Cijfer Import" },
 ];
 
 export function Layout({ children }: { children: ReactNode }) {
