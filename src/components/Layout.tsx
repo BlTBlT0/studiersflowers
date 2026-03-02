@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, BookOpen, Calendar, Wand2, GraduationCap, BarChart3, CalendarDays, Menu, X, LogOut, Sun, Moon } from "lucide-react";
+import { LayoutDashboard, BookOpen, Calendar, Wand2, GraduationCap, BarChart3, CalendarDays, Download, Menu, X, LogOut, Sun, Moon } from "lucide-react";
 import { useState } from "react";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
@@ -15,6 +15,7 @@ const navItems = [
   { to: "/grades", icon: GraduationCap, label: "Cijfers" },
   { to: "/stats", icon: BarChart3, label: "Statistieken" },
   { to: "/week", icon: CalendarDays, label: "Weekkalender" },
+  { to: "/magister", icon: Download, label: "Magister Import" },
 ];
 
 export function Layout({ children }: { children: ReactNode }) {
