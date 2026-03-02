@@ -54,6 +54,7 @@ const App = () => (
                       <Route path="/grades" element={<Grades />} />
                       <Route path="/stats" element={<Stats />} />
                       <Route path="/week" element={<WeekCalendar />} />
+                      <Route path="/magister" element={<MagisterImport />} />
                       <Route path="*" element={<NotFound />} />
                     </Routes>
                   </Layout>
