@@ -84,48 +84,20 @@ async function magisterLogin(
   // Read body to consume the response
   const mainHTML = await initRes.text();
 
-  // 3. Extract authCode from the login page JavaScript
-  // Try multiple patterns to find the script tag
-  let jsPath = "";
-  const scriptPatterns = [
-    /<script src="([^"]+?)"\s*>/,
-    /<script[^>]+src="([^"]+\.js[^"]*)"/,
-    /src="(\/[^"]*bundle[^"]*\.js)"/,
-    /src="(\/[^"]*main[^"]*\.js)"/,
-    /src="(\/[^"]*app[^"]*\.js)"/,
-  ];
-
-  for (const pattern of scriptPatterns) {
-    const match = mainHTML.match(pattern);
-    if (match) {
-      jsPath = match[1];
-      break;
-    }
+  // 3. Fetch the authCode from the maintained gist (changes frequently)
+  let authCode = "";
+  try {
+    const authCodeRes = await fetch(
+      "https://gist.githubusercontent.com/robbertkl/995a359d1c9641892e3de1ed9af18b15/raw/authcode.json"
+    );
+    const authCodeData = await authCodeRes.json();
+    authCode = typeof authCodeData === "string" ? authCodeData : (authCodeData?.code || "");
+  } catch (e) {
+    console.error("Could not fetch authCode from gist:", e);
   }
 
-  // If we can't find the JS, try to proceed without authCode
-  // Some versions of Magister don't require it
-  let authCode = "";
-
-  if (jsPath) {
-    const jsUrl = jsPath.startsWith("http") ? jsPath : `${authority}${jsPath.startsWith("/") ? "" : "/"}${jsPath}`;
-    const js = await (await fetch(jsUrl)).text();
-
-    // Extract the authCode array from the JS
-    try {
-      const codeMatch = js.match(/\[([^\]]*"[^\]]*)\]\.join\(""\)/);
-      if (codeMatch) {
-        const arrayStr = `[${codeMatch[1]}]`;
-        const arr = JSON.parse(arrayStr);
-        authCode = arr.join("");
-      }
-    } catch {
-      console.log("Could not extract authCode from JS, proceeding without it");
-    }
-  } else {
-    console.log("No JS bundle found in login page, proceeding without authCode");
-    console.log("Login page URL:", initRes.url);
-    console.log("HTML preview:", mainHTML.substring(0, 500));
+  if (!authCode) {
+    throw new Error("Kan authCode niet ophalen. Probeer het later opnieuw.");
   }
 
   const returnUrl = genUrl("/connect/authorize/callback", queryParams);
