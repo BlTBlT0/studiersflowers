@@ -340,7 +340,7 @@ Deno.serve(async (req) => {
       const grades = await fetchGrades(session);
       if (grades.length > 0) {
         const gradeRows = grades.map((g) => ({
-          user_id: user.id,
+          user_id: userId,
           subject: g.subject,
           grade: g.grade,
           description: g.description,
