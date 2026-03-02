@@ -10,25 +10,8 @@ import { useState } from "react";
 
 const Grades = () => {
   const { data: grades = [], isLoading } = useGrades();
-  const { addGrade, deleteGrade } = useGradeMutations();
-  const [open, setOpen] = useState(false);
-  const [subject, setSubject] = useState("");
-  const [grade, setGrade] = useState("");
-  const [description, setDescription] = useState("");
-  const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const { deleteGrade } = useGradeMutations();
   const [filterSubject, setFilterSubject] = useState<string>("all");
-
-  const handleAdd = () => {
-    const num = parseFloat(grade);
-    if (!subject || isNaN(num) || num < 1 || num > 10) {
-      toast.error("Vul een geldig cijfer in (1-10)");
-      return;
-    }
-    addGrade.mutate({ subject, grade: num, date, description });
-    setOpen(false);
-    setGrade("");
-    setDescription("");
-  };
 
   // Compute averages per subject
   const subjectMap = new Map<string, number[]>();
