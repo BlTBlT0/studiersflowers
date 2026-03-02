@@ -3,12 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  ClipboardPaste,
-  AlertTriangle,
   Loader2,
   CheckCircle2,
   Trash2,
   Upload,
+  Lightbulb,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -23,44 +22,32 @@ import {
 } from "@/components/ui/table";
 
 const KNOWN_SUBJECTS: Record<string, string> = {
-  ak: "Aardrijkskunde", aardrijkskunde: "Aardrijkskunde",
-  bi: "Biologie", biologie: "Biologie",
-  en: "Engels", engels: "Engels",
-  fa: "Frans", frans: "Frans",
-  "franse taal en literatuur": "Frans",
+  ak: "Aardrijkskunde", aard: "Aardrijkskunde", aardrijkskunde: "Aardrijkskunde",
+  bi: "Biologie", bio: "Biologie", biologie: "Biologie",
+  en: "Engels", eng: "Engels", engels: "Engels",
+  fa: "Frans", fra: "Frans", frans: "Frans",
   gr: "Grieks", grieks: "Grieks",
-  gs: "Geschiedenis", geschiedenis: "Geschiedenis",
-  ku: "Kunst", kunst: "Kunst", kunstonderwijs: "Kunst",
-  lo: "Lichamelijke Opvoeding",
+  gs: "Geschiedenis", gesch: "Geschiedenis", geschiedenis: "Geschiedenis",
+  ku: "Kunst", kunst: "Kunst",
+  lo: "Lichamelijke Opvoeding", gym: "Lichamelijke Opvoeding",
   mu: "Muziek", muziek: "Muziek",
-  na: "Natuurkunde", natuurkunde: "Natuurkunde",
-  ne: "Nederlands", nederlands: "Nederlands",
-  "nederlandse taal en literatuur": "Nederlands",
-  sk: "Scheikunde", scheikunde: "Scheikunde",
-  wi: "Wiskunde", wiskunde: "Wiskunde",
-  wia: "Wiskunde A", wib: "Wiskunde B", wic: "Wiskunde C", wid: "Wiskunde D",
-  ec: "Economie", economie: "Economie",
+  na: "Natuurkunde", nat: "Natuurkunde", natuurkunde: "Natuurkunde",
+  ne: "Nederlands", ned: "Nederlands", nederlands: "Nederlands",
+  sk: "Scheikunde", schei: "Scheikunde", scheikunde: "Scheikunde",
+  wi: "Wiskunde", wis: "Wiskunde", wiskunde: "Wiskunde",
+  ec: "Economie", eco: "Economie", economie: "Economie",
   ma: "Maatschappijleer", maw: "Maatschappijwetenschappen",
   ckv: "CKV", la: "Latijn", latijn: "Latijn",
   du: "Duits", duits: "Duits", sp: "Spaans", spaans: "Spaans",
-  in: "Informatica", informatica: "Informatica",
+  in: "Informatica", info: "Informatica", informatica: "Informatica",
   fil: "Filosofie", filosofie: "Filosofie",
-  te: "Tekenen", ht: "Handvaardigheid", txt: "Textiel",
+  te: "Tekenen", ht: "Handvaardigheid",
 };
 
 function normalizeSubject(raw: string): string {
-  // Clean up truncated names like "Nederlandse taal e..." or "Franse taal en liter..."
-  const cleaned = raw.replace(/\.{2,}$/, "").trim();
-  const lower = cleaned.toLowerCase();
-  
+  const lower = raw.toLowerCase().trim();
   if (KNOWN_SUBJECTS[lower]) return KNOWN_SUBJECTS[lower];
-  
-  // Partial match for truncated names
-  for (const [key, value] of Object.entries(KNOWN_SUBJECTS)) {
-    if (key.startsWith(lower) || lower.startsWith(key)) return value;
-  }
-  
-  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+  return raw.trim().charAt(0).toUpperCase() + raw.trim().slice(1);
 }
 
 interface ParsedGrade {
@@ -68,86 +55,80 @@ interface ParsedGrade {
   grade: number;
   description: string;
   date: string;
-  weight: string;
 }
 
-function parsePastedData(text: string): ParsedGrade[] {
-  const lines = text.split("\n").filter((l) => l.trim());
-  const grades: ParsedGrade[] = [];
+function parseLine(line: string): ParsedGrade | null {
+  const trimmed = line.trim();
+  if (!trimmed) return null;
 
-  for (const line of lines) {
-    // Split by tab (copy-paste from browser table uses tabs)
-    const cols = line.split("\t").map((c) => c.trim());
-    
-    // Expected: Vak | Datum invoer | Omschrijving | Resultaat | Weegfactor
-    // But also handle if header row is included
-    if (cols.length < 4) continue;
+  // Try to find a date pattern (DD-MM-YYYY or YYYY-MM-DD) anywhere in the line
+  let date = new Date().toISOString().split("T")[0];
+  let remaining = trimmed;
 
-    // Skip header row
-    if (
-      cols[0].toLowerCase().includes("vak") &&
-      cols.some((c) => c.toLowerCase().includes("resultaat") || c.toLowerCase().includes("cijfer"))
-    ) continue;
+  const datePatternDMY = /\b(\d{1,2})-(\d{1,2})-(\d{4})\b/;
+  const datePatternYMD = /\b(\d{4})-(\d{1,2})-(\d{1,2})\b/;
 
-    // Try to find the grade value - could be in different positions
-    // Magister format: Vak, Datum, Omschrijving, Resultaat, Weegfactor
-    let subject = cols[0];
-    let dateStr = cols[1];
-    let description = cols[2];
-    let gradeStr = cols[3];
-    let weight = cols[4] || "1x";
-
-    // Parse grade (handle comma as decimal separator)
-    const gradeNum = parseFloat(gradeStr.replace(",", "."));
-    
-    // If this doesn't look like a grade, the result might be text (like "opmerking bij resultaat")
-    if (isNaN(gradeNum)) continue;
-    // Filter out non-numeric grades or out-of-range
-    if (gradeNum < 1 || gradeNum > 10) continue;
-    
-    // Skip 0x weight entries (comments, not actual grades)
-    if (weight === "0x") continue;
-
-    // Parse date (DD-MM-YYYY format from Magister)
-    let isoDate = new Date().toISOString().split("T")[0];
-    if (dateStr) {
-      const parts = dateStr.split("-");
-      if (parts.length === 3) {
-        const [d, m, y] = parts;
-        const attempt = new Date(`${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`);
-        if (!isNaN(attempt.getTime())) {
-          isoDate = attempt.toISOString().split("T")[0];
-        }
-      }
+  const dmyMatch = remaining.match(datePatternDMY);
+  if (dmyMatch) {
+    const attempt = new Date(`${dmyMatch[3]}-${dmyMatch[2].padStart(2, "0")}-${dmyMatch[1].padStart(2, "0")}`);
+    if (!isNaN(attempt.getTime())) date = attempt.toISOString().split("T")[0];
+    remaining = remaining.replace(dmyMatch[0], "").trim();
+  } else {
+    const ymdMatch = remaining.match(datePatternYMD);
+    if (ymdMatch) {
+      const attempt = new Date(`${ymdMatch[1]}-${ymdMatch[2].padStart(2, "0")}-${ymdMatch[3].padStart(2, "0")}`);
+      if (!isNaN(attempt.getTime())) date = attempt.toISOString().split("T")[0];
+      remaining = remaining.replace(ymdMatch[0], "").trim();
     }
-
-    grades.push({
-      subject: normalizeSubject(subject),
-      grade: Math.round(gradeNum * 10) / 10,
-      description,
-      date: isoDate,
-      weight,
-    });
   }
 
-  return grades;
+  // Find the grade number (decimal with . or ,)
+  const gradeMatch = remaining.match(/\b(\d{1,2}[.,]\d{1,2}|\d{1,2})\b/);
+  if (!gradeMatch) return null;
+
+  const gradeNum = parseFloat(gradeMatch[1].replace(",", "."));
+  if (isNaN(gradeNum) || gradeNum < 1 || gradeNum > 10) return null;
+
+  // Everything before the grade = subject, everything after = description
+  const gradeIdx = remaining.indexOf(gradeMatch[0]);
+  const subject = remaining.substring(0, gradeIdx).trim();
+  const description = remaining.substring(gradeIdx + gradeMatch[0].length).trim();
+
+  if (!subject) return null;
+
+  return {
+    subject: normalizeSubject(subject),
+    grade: Math.round(gradeNum * 10) / 10,
+    description,
+    date,
+  };
 }
 
+const EXAMPLE = `wi 7,2 Poduo
+ne 7,8 Boekpitch
+kunst 8,0 Kleurensplash
+ak 7,1 Poster Burgers Zoo
+gs 6,7 Duo-toets Grieken en Romeinen`;
+
 const MagisterImport = () => {
-  const [pasteValue, setPasteValue] = useState("");
+  const [text, setText] = useState("");
   const [parsedGrades, setParsedGrades] = useState<ParsedGrade[]>([]);
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<number | null>(null);
   const qc = useQueryClient();
 
   const handleParse = () => {
-    if (!pasteValue.trim()) {
-      toast.error("Plak eerst je cijfers in het tekstveld");
+    if (!text.trim()) {
+      toast.error("Typ eerst je cijfers in het tekstveld");
       return;
     }
-    const grades = parsePastedData(pasteValue);
+    const grades = text
+      .split("\n")
+      .map(parseLine)
+      .filter((g): g is ParsedGrade => g !== null);
+
     if (grades.length === 0) {
-      toast.error("Geen geldige cijfers gevonden. Heb je de tabel goed gekopieerd?");
+      toast.error("Geen geldige cijfers gevonden. Gebruik het formaat: vak cijfer omschrijving");
       return;
     }
     setParsedGrades(grades);
@@ -180,7 +161,7 @@ const MagisterImport = () => {
       toast.success(`${parsedGrades.length} cijfer(s) geïmporteerd!`);
       qc.invalidateQueries({ queryKey: ["grades"] });
       setParsedGrades([]);
-      setPasteValue("");
+      setText("");
     } catch (err: any) {
       toast.error(err.message || "Import mislukt");
     } finally {
@@ -192,50 +173,49 @@ const MagisterImport = () => {
     setParsedGrades((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  const fillExample = () => {
+    setText(EXAMPLE);
+    setParsedGrades([]);
+    setResult(null);
+  };
+
   return (
     <div>
       <div className="mb-6">
         <h1 className="font-display text-2xl font-bold">Cijfers Importeren</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Kopieer en plak je cijfers vanuit Magister
+          Typ je cijfers snel in — één per regel
         </p>
       </div>
 
-      <Card className="mb-6 border-amber-500/30 bg-amber-500/5">
-        <CardContent className="flex items-start gap-3 p-4">
-          <AlertTriangle size={20} className="mt-0.5 shrink-0 text-amber-500" />
-          <div className="text-sm">
-            <p className="font-medium text-amber-500">Zo werkt het</p>
-            <ol className="mt-1 list-decimal pl-4 text-muted-foreground space-y-1">
-              <li>Open Magister → <strong>Cijfers</strong> → <strong>Laatste cijfers</strong></li>
-              <li>Selecteer alle rijen in de tabel (klik op de eerste rij, dan Shift+klik op de laatste)</li>
-              <li>Kopieer met <strong>⌘+C</strong> (Mac) of <strong>Ctrl+C</strong> (Windows)</li>
-              <li>Plak hieronder met <strong>⌘+V</strong> of <strong>Ctrl+V</strong></li>
-            </ol>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Paste area */}
+      {/* Input */}
       <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <ClipboardPaste size={18} />
-            Plak je cijfers
-          </CardTitle>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Typ je cijfers</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Formaat per regel: <span className="font-mono bg-muted px-1 py-0.5 rounded">vak cijfer omschrijving</span>
+            {" "}— datum optioneel (DD-MM-YYYY)
+          </p>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           <Textarea
-            placeholder={"Nederlandse taal e...\t02-03-2026\tBoekpitch\t7,8\t1x\nkunstonderwijs\t06-02-2026\tKoraal\t7,3\t1x\n..."}
-            value={pasteValue}
-            onChange={(e) => setPasteValue(e.target.value)}
-            rows={6}
-            className="font-mono text-xs"
+            placeholder={"wi 7,2 Poduo\nne 7,8 Boekpitch\nkunst 8,0 Kleurensplash 26-01-2026"}
+            value={text}
+            onChange={(e) => { setText(e.target.value); setParsedGrades([]); setResult(null); }}
+            rows={8}
+            className="font-mono text-sm leading-relaxed"
           />
-          <Button onClick={handleParse} disabled={!pasteValue.trim()}>
-            <ClipboardPaste size={16} className="mr-2" />
-            Cijfers herkennen
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={handleParse} disabled={!text.trim()} className="flex-1">
+              Cijfers herkennen
+            </Button>
+            <Button variant="outline" size="icon" onClick={fillExample} title="Vul voorbeeld in">
+              <Lightbulb size={16} />
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            💡 Afkortingen werken: <span className="font-mono">wi</span> = Wiskunde, <span className="font-mono">ne</span> = Nederlands, <span className="font-mono">en</span> = Engels, <span className="font-mono">ak</span> = Aardrijkskunde, etc.
+          </p>
         </CardContent>
       </Card>
 
@@ -271,12 +251,7 @@ const MagisterImport = () => {
                         {g.date}
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => removeGrade(i)}
-                        >
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeGrade(i)}>
                           <Trash2 size={14} />
                         </Button>
                       </TableCell>
@@ -286,21 +261,11 @@ const MagisterImport = () => {
               </Table>
             </div>
 
-            <Button
-              onClick={handleImport}
-              disabled={importing}
-              className="w-full mt-4"
-            >
+            <Button onClick={handleImport} disabled={importing} className="w-full mt-4">
               {importing ? (
-                <>
-                  <Loader2 size={16} className="mr-2 animate-spin" />
-                  Importeren...
-                </>
+                <><Loader2 size={16} className="mr-2 animate-spin" />Importeren...</>
               ) : (
-                <>
-                  <Upload size={16} className="mr-2" />
-                  {parsedGrades.length} cijfer(s) importeren
-                </>
+                <><Upload size={16} className="mr-2" />{parsedGrades.length} cijfer(s) importeren</>
               )}
             </Button>
           </CardContent>
@@ -313,9 +278,7 @@ const MagisterImport = () => {
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
               <CheckCircle2 size={18} className="text-primary" />
-              <p className="font-medium text-sm">
-                {result} cijfer(s) succesvol geïmporteerd!
-              </p>
+              <p className="font-medium text-sm">{result} cijfer(s) succesvol geïmporteerd!</p>
             </div>
           </CardContent>
         </Card>
