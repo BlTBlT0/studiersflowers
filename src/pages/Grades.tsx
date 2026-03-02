@@ -2,14 +2,15 @@ import { useGrades, useGradeMutations } from "@/hooks/useSupabaseData";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trash2, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Trash2, TrendingUp, TrendingDown, Minus, Award } from "lucide-react";
 import { format } from "date-fns";
 import { nl } from "date-fns/locale";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, CartesianGrid, Cell } from "recharts";
 import { useState } from "react";
 
 const Grades = () => {
-  const { data: grades = [], isLoading } = useGrades();
+  const { data: grades = [], isLoading } = useGrades(false);
+  const { data: finalGrades = [], isLoading: finalLoading } = useGrades(true);
   const { deleteGrade } = useGradeMutations();
   const [filterSubject, setFilterSubject] = useState<string>("all");
 
