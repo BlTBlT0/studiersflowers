@@ -222,15 +222,23 @@ export function useTimeTrackingMutations() {
 // ---- GRADES ----
 export type DbGrade = Tables<"grades">;
 
-export function useGrades() {
+export function useGrades(finalOnly?: boolean) {
   const { user } = useAuth();
   return useQuery({
-    queryKey: ["grades", user?.id],
+    queryKey: ["grades", user?.id, finalOnly ? "final" : "regular"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("grades")
         .select("*")
         .order("date", { ascending: false });
+      
+      if (finalOnly === true) {
+        query = query.eq("is_final_grade", true);
+      } else if (finalOnly === false) {
+        query = query.eq("is_final_grade", false);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data as DbGrade[];
     },

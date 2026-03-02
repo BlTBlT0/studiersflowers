@@ -112,13 +112,13 @@ function parseLine(line: string): ParsedGrade | null {
 }
 
 // --- .stgrades file parser ---
-function parseStGradesFile(jsonStr: string): { grades: ParsedGrade[]; summary: { subject: string; type: string; grade: number }[] } {
+function parseStGradesFile(jsonStr: string): { grades: ParsedGrade[]; finalGrades: ParsedGrade[] } {
   try {
     const data = JSON.parse(jsonStr);
     const grades: ParsedGrade[] = [];
-    const summary: { subject: string; type: string; grade: number }[] = [];
+    const finalGrades: ParsedGrade[] = [];
 
-    if (!data.grades || !Array.isArray(data.grades)) return { grades: [], summary: [] };
+    if (!data.grades || !Array.isArray(data.grades)) return { grades: [], finalGrades: [] };
 
     for (const g of data.grades) {
       if (!g.TeltMee) continue;
@@ -133,20 +133,10 @@ function parseStGradesFile(jsonStr: string): { grades: ParsedGrade[]; summary: {
       const kolomSoort = g.CijferKolom?.KolomSoort;
       const kolomOmschrijving = (g.CijferKolom?.KolomOmschrijving || "").toLowerCase();
 
-      // KolomSoort 2 = calculated (eindcijfer, voortschrijdend gemiddelde, etc.)
       const isCalculated = kolomSoort === 2 ||
         kolomOmschrijving.includes("eindcijfer") ||
         kolomOmschrijving.includes("voortschrijdend") ||
         kolomOmschrijving.includes("gemiddelde");
-
-      if (isCalculated) {
-        summary.push({
-          subject: normalizeSubject(subjectRaw),
-          type: g.CijferKolom?.KolomOmschrijving || g.CijferKolom?.KolomKop || "Berekend",
-          grade: Math.round(gradeNum * 10) / 10,
-        });
-        continue;
-      }
 
       const dateStr = g.DatumIngevoerd
         ? new Date(g.DatumIngevoerd).toISOString().split("T")[0]
@@ -154,17 +144,23 @@ function parseStGradesFile(jsonStr: string): { grades: ParsedGrade[]; summary: {
 
       const description = g.CijferKolom?.KolomOmschrijving || g.CijferKolom?.KolomKop || "";
 
-      grades.push({
+      const parsed: ParsedGrade = {
         subject: normalizeSubject(subjectRaw),
         grade: Math.round(gradeNum * 10) / 10,
         description,
         date: dateStr,
-      });
+      };
+
+      if (isCalculated) {
+        finalGrades.push(parsed);
+      } else {
+        grades.push(parsed);
+      }
     }
 
-    return { grades, summary };
+    return { grades, finalGrades };
   } catch {
-    return { grades: [], summary: [] };
+    return { grades: [], finalGrades: [] };
   }
 }
 
