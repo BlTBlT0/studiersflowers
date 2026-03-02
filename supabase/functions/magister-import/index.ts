@@ -124,25 +124,29 @@ async function magisterLogin(
         found++;
       }
       
-      // Also search for .join("") patterns
-      const joinIdx = js.indexOf('.join("")');
-      if (joinIdx >= 0) {
-        // Find the start of the array
-        const searchStart = Math.max(0, joinIdx - 200);
-        const context = js.substring(searchStart, joinIdx + 10);
-        console.log("Found .join('') pattern, context:", context);
-        
-        // Extract the array
-        const arrayMatch = context.match(/\[([^\]]+)\]\.join\(""\)/);
-        if (arrayMatch) {
-          try {
-            const arr = JSON.parse(`[${arrayMatch[1]}]`);
-            authCode = arr.join("");
-            console.log("Extracted authCode from .join pattern, length:", authCode.length);
-          } catch (e) {
-            console.log("Failed to parse array:", e);
+      // Search for ALL .join patterns (various syntaxes)
+      const joinPatterns = ['.join("")', ".join('')", '.join("")', ".join('')"];
+      for (const jp of joinPatterns) {
+        let jIdx = 0;
+        while ((jIdx = js.indexOf(jp, jIdx)) !== -1) {
+          const ctx = js.substring(Math.max(0, jIdx - 300), jIdx + 15);
+          console.log(`join pattern at ${jIdx}:`, ctx.substring(ctx.length - 100));
+          // Try to find array before join
+          const arrMatch = ctx.match(/\[([^\]]*"[^\]]*)\]\.join/);
+          if (arrMatch) {
+            try {
+              const arr = JSON.parse(`[${arrMatch[1]}]`);
+              const candidate = arr.join("");
+              if (candidate && /^[a-f0-9]+$/.test(candidate) && candidate.length > 8) {
+                authCode = candidate;
+                console.log("Extracted authCode:", authCode);
+                break;
+              }
+            } catch {}
           }
+          jIdx += jp.length;
         }
+        if (authCode) break;
       }
       
       // Try direct patterns
