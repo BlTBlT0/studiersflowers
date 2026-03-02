@@ -1,1 +1,4 @@
 project_id = "rrlounryfmkfujjxwjqn"
+
+[functions.magister-import]
+verify_jwt = false
