@@ -72,60 +72,145 @@ async function magisterLogin(
     nonce: defaultNonce,
   };
 
-  // 2. Init cookies - visit authorization endpoint
+  // 2. Init cookies - visit authorization endpoint, manually follow redirects to capture all cookies
   const authUrl = genUrl(endpoints.authorization_endpoint, queryParams);
-  const initRes = await fetch(authUrl, { redirect: "follow" });
-  jar.addFromHeaders(initRes.headers);
+  let currentUrl = authUrl;
+  let initRes: Response;
+  for (let i = 0; i < 10; i++) {
+    initRes = await fetch(currentUrl, { redirect: "manual" });
+    jar.addFromHeaders(initRes.headers);
+    const location = initRes.headers.get("location");
+    if (!location || initRes.status < 300 || initRes.status >= 400) {
+      // Read body on final response
+      break;
+    }
+    await initRes.text(); // consume body
+    currentUrl = location.startsWith("http") ? location : `https://accounts.magister.net${location}`;
+  }
 
   // Extract sessionId from the final URL
-  const finalUrl = new URL(initRes.url);
+  const finalUrl = new URL(currentUrl);
   const sessionId = finalUrl.searchParams.get("sessionId") || "";
+  console.log("Final URL:", currentUrl);
+  console.log("SessionId:", sessionId);
+  console.log("Cookies:", jar.toString().substring(0, 200));
 
   // Read body to consume the response
   const mainHTML = await initRes.text();
+  // Log HTML to find inline scripts or authCode data
+  console.log("HTML length:", mainHTML.length);
+  // Find inline script tags (no src attribute)
+  const inlineScripts = [...mainHTML.matchAll(/<script(?![^>]*src)[^>]*>([\s\S]*?)<\/script>/g)];
+  console.log("Inline scripts found:", inlineScripts.length);
+  for (const [, content] of inlineScripts) {
+    if (content.trim()) {
+      console.log("Inline script content:", content.substring(0, 500));
+    }
+  }
+  // Check for data attributes or hidden inputs
+  const dataAttrs = mainHTML.match(/data-[a-z-]+="[^"]*"/g);
+  if (dataAttrs) console.log("Data attributes:", dataAttrs.slice(0, 10));
+  const hiddenInputs = mainHTML.match(/<input[^>]*type="hidden"[^>]*>/g);
+  if (hiddenInputs) console.log("Hidden inputs:", hiddenInputs);
 
   // 3. Extract authCode from the login page JavaScript
-  // Try multiple patterns to find the script tag
-  let jsPath = "";
-  const scriptPatterns = [
-    /<script src="([^"]+?)"\s*>/,
-    /<script[^>]+src="([^"]+\.js[^"]*)"/,
-    /src="(\/[^"]*bundle[^"]*\.js)"/,
-    /src="(\/[^"]*main[^"]*\.js)"/,
-    /src="(\/[^"]*app[^"]*\.js)"/,
-  ];
-
-  for (const pattern of scriptPatterns) {
-    const match = mainHTML.match(pattern);
-    if (match) {
-      jsPath = match[1];
-      break;
+  let authCode = "";
+  
+  // Find all script tags
+  const scriptMatches = [...mainHTML.matchAll(/<script[^>]+src="([^"]+)"/g)];
+  console.log("Found script tags:", scriptMatches.map(m => m[1]));
+  
+  for (const match of scriptMatches) {
+    const jsPath = match[1];
+    const jsUrl = jsPath.startsWith("http") ? jsPath : `https://accounts.magister.net${jsPath.startsWith("/") ? "" : "/"}${jsPath}`;
+    try {
+      const js = await (await fetch(jsUrl)).text();
+      console.log("JS file length:", js.length);
+      
+      // Search for ALL authCode mentions
+      let idx = 0;
+      let found = 0;
+      while ((idx = js.indexOf("authCode", idx)) !== -1 && found < 5) {
+        console.log(`authCode mention #${found} at ${idx}:`, js.substring(Math.max(0, idx - 100), idx + 100));
+        idx += 8;
+        found++;
+      }
+      
+      // Find the authCode construction pattern: array of hex strings with index mapping
+      // Pattern: var a=["hex1","hex2",...],b=["idx1","idx2",...].map(fn).join("")
+      const authCodePattern = js.match(/var\s+(\w+)\s*=\s*\[((?:"[^"]*",?\s*)+)\][\s\S]{0,50}?\[([^\]]+)\]\.map\(\(?function\(\w+\)\{return\s+\1\[parseInt\(\w+\)\|\|0\]\}\)?\)\.join\(""\)/);
+      if (authCodePattern) {
+        try {
+          const hexArr = JSON.parse(`[${authCodePattern[2]}]`);
+          const idxArr = JSON.parse(`[${authCodePattern[3]}]`);
+          authCode = idxArr.map((i: string) => hexArr[parseInt(i) || 0]).join("");
+          console.log("Extracted authCode from indexed array:", authCode);
+        } catch (e) {
+          console.log("Failed to parse authCode pattern:", e);
+        }
+      }
+      
+      if (!authCode) {
+        // Broader search: find the pattern near "Yu" (which follows authCode assignment)
+        const yuIdx = js.indexOf("),r=Yu");
+        if (yuIdx > 0) {
+          const ctx = js.substring(Math.max(0, yuIdx - 500), yuIdx + 5);
+          console.log("Context before Yu:", ctx);
+          // Extract: a=["hex",...],["idx",...].map(...).join("")
+          const match = ctx.match(/(\w+)\s*=\s*\[((?:"[^"]*",?\s*)+)\].*?\[([^\]]+)\]\.map\(\(?function\(\w+\)\{return\s+\1\[parseInt\(\w+\)\|\|0\]\}\)?\)\.join\(""\)/);
+          if (match) {
+            try {
+              const hexArr = JSON.parse(`[${match[2]}]`);
+              const idxArr = JSON.parse(`[${match[3]}]`);
+              authCode = idxArr.map((i: string) => hexArr[parseInt(i) || 0]).join("");
+              console.log("Extracted authCode (Yu method):", authCode);
+            } catch (e) {
+              console.log("Failed to parse Yu pattern:", e);
+            }
+          }
+        }
+      }
+      
+      // Try direct patterns
+      if (!authCode) {
+        const patterns = [
+          /authCode\s*[:=]\s*"([^"]+)"/,
+          /authCode\s*[:=]\s*'([^']+)'/,
+          /"authCode"\s*:\s*"([^"]+)"/,
+          /authCode\s*,\s*value\s*:\s*"([^"]+)"/,
+        ];
+        for (const pattern of patterns) {
+          const codeMatch = js.match(pattern);
+          if (codeMatch) {
+            authCode = codeMatch[1];
+            console.log("Found authCode via pattern:", pattern.source, "length:", authCode.length);
+            break;
+          }
+        }
+      }
+      
+      if (authCode) break;
+    } catch (e) {
+      console.log("Failed to fetch/parse JS:", jsUrl, e);
     }
   }
 
-  // If we can't find the JS, try to proceed without authCode
-  // Some versions of Magister don't require it
-  let authCode = "";
-
-  if (jsPath) {
-    const jsUrl = jsPath.startsWith("http") ? jsPath : `${authority}${jsPath.startsWith("/") ? "" : "/"}${jsPath}`;
-    const js = await (await fetch(jsUrl)).text();
-
-    // Extract the authCode array from the JS
+  // Fallback: try the maintained gist
+  if (!authCode) {
     try {
-      const codeMatch = js.match(/\[([^\]]*"[^\]]*)\]\.join\(""\)/);
-      if (codeMatch) {
-        const arrayStr = `[${codeMatch[1]}]`;
-        const arr = JSON.parse(arrayStr);
-        authCode = arr.join("");
-      }
-    } catch {
-      console.log("Could not extract authCode from JS, proceeding without it");
+      const authCodeRes = await fetch(
+        "https://gist.githubusercontent.com/robbertkl/995a359d1c9641892e3de1ed9af18b15/raw/authcode.json"
+      );
+      const authCodeData = await authCodeRes.json();
+      authCode = typeof authCodeData === "string" ? authCodeData : (authCodeData?.code || "");
+      console.log("Using gist authCode, length:", authCode.length);
+    } catch (e) {
+      console.error("Could not fetch authCode from gist:", e);
     }
-  } else {
-    console.log("No JS bundle found in login page, proceeding without authCode");
-    console.log("Login page URL:", initRes.url);
-    console.log("HTML preview:", mainHTML.substring(0, 500));
+  }
+
+  if (!authCode) {
+    throw new Error("Kan authCode niet ophalen. Probeer het later opnieuw.");
   }
 
   const returnUrl = genUrl("/connect/authorize/callback", queryParams);
@@ -168,12 +253,17 @@ async function magisterLogin(
   }
 
   // 4. Submit challenges
-  await submitChallenge("current");
-  await submitChallenge("username", { name: "username", value: username });
+  const currentRes = await submitChallenge("current");
+  console.log("Challenge 'current' response:", JSON.stringify(currentRes));
+  
+  const usernameRes = await submitChallenge("username", { name: "username", value: username });
+  console.log("Challenge 'username' response:", JSON.stringify(usernameRes));
+  
   const passwordRes = await submitChallenge("password", {
     name: "password",
     value: password,
   });
+  console.log("Challenge 'password' response:", JSON.stringify(passwordRes));
 
   if (!passwordRes.redirectURL) {
     throw new Error(
