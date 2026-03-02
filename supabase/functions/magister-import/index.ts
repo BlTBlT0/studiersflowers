@@ -86,16 +86,61 @@ async function magisterLogin(
   // Read body to consume the response
   const mainHTML = await initRes.text();
 
-  // 3. Fetch the authCode from the maintained gist (changes frequently)
+  // 3. Extract authCode from the login page JavaScript
   let authCode = "";
-  try {
-    const authCodeRes = await fetch(
-      "https://gist.githubusercontent.com/robbertkl/995a359d1c9641892e3de1ed9af18b15/raw/authcode.json"
-    );
-    const authCodeData = await authCodeRes.json();
-    authCode = typeof authCodeData === "string" ? authCodeData : (authCodeData?.code || "");
-  } catch (e) {
-    console.error("Could not fetch authCode from gist:", e);
+  
+  // Find all script tags
+  const scriptMatches = [...mainHTML.matchAll(/<script[^>]+src="([^"]+)"/g)];
+  console.log("Found script tags:", scriptMatches.map(m => m[1]));
+  
+  for (const match of scriptMatches) {
+    const jsPath = match[1];
+    const jsUrl = jsPath.startsWith("http") ? jsPath : `https://accounts.magister.net${jsPath.startsWith("/") ? "" : "/"}${jsPath}`;
+    try {
+      const js = await (await fetch(jsUrl)).text();
+      // Try multiple patterns to extract authCode
+      const patterns = [
+        /\[([^\]]*"[^\]]*)\]\.join\(""\)/,
+        /authCode\s*[:=]\s*"([^"]+)"/,
+        /authCode\s*[:=]\s*'([^']+)'/,
+        /"authCode"\s*:\s*"([^"]+)"/,
+      ];
+      for (const pattern of patterns) {
+        const codeMatch = js.match(pattern);
+        if (codeMatch) {
+          if (pattern === patterns[0]) {
+            // Array.join pattern
+            try {
+              const arr = JSON.parse(`[${codeMatch[1]}]`);
+              authCode = arr.join("");
+            } catch {}
+          } else {
+            authCode = codeMatch[1];
+          }
+          if (authCode) {
+            console.log("Found authCode from JS:", jsUrl, "length:", authCode.length);
+            break;
+          }
+        }
+      }
+      if (authCode) break;
+    } catch (e) {
+      console.log("Failed to fetch/parse JS:", jsUrl, e);
+    }
+  }
+
+  // Fallback: try the maintained gist
+  if (!authCode) {
+    try {
+      const authCodeRes = await fetch(
+        "https://gist.githubusercontent.com/robbertkl/995a359d1c9641892e3de1ed9af18b15/raw/authcode.json"
+      );
+      const authCodeData = await authCodeRes.json();
+      authCode = typeof authCodeData === "string" ? authCodeData : (authCodeData?.code || "");
+      console.log("Using gist authCode, length:", authCode.length);
+    } catch (e) {
+      console.error("Could not fetch authCode from gist:", e);
+    }
   }
 
   if (!authCode) {
