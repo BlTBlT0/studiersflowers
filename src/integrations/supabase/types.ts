@@ -48,6 +48,7 @@ export type Database = {
           description: string | null
           grade: number
           id: string
+          is_final_grade: boolean
           subject: string
           user_id: string
         }
@@ -57,6 +58,7 @@ export type Database = {
           description?: string | null
           grade: number
           id?: string
+          is_final_grade?: boolean
           subject: string
           user_id: string
         }
@@ -66,6 +68,7 @@ export type Database = {
           description?: string | null
           grade?: number
           id?: string
+          is_final_grade?: boolean
           subject?: string
           user_id?: string
         }

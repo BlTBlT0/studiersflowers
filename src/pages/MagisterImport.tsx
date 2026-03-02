@@ -112,13 +112,13 @@ function parseLine(line: string): ParsedGrade | null {
 }
 
 // --- .stgrades file parser ---
-function parseStGradesFile(jsonStr: string): { grades: ParsedGrade[]; summary: { subject: string; type: string; grade: number }[] } {
+function parseStGradesFile(jsonStr: string): { grades: ParsedGrade[]; finalGrades: ParsedGrade[] } {
   try {
     const data = JSON.parse(jsonStr);
     const grades: ParsedGrade[] = [];
-    const summary: { subject: string; type: string; grade: number }[] = [];
+    const finalGrades: ParsedGrade[] = [];
 
-    if (!data.grades || !Array.isArray(data.grades)) return { grades: [], summary: [] };
+    if (!data.grades || !Array.isArray(data.grades)) return { grades: [], finalGrades: [] };
 
     for (const g of data.grades) {
       if (!g.TeltMee) continue;
@@ -133,20 +133,10 @@ function parseStGradesFile(jsonStr: string): { grades: ParsedGrade[]; summary: {
       const kolomSoort = g.CijferKolom?.KolomSoort;
       const kolomOmschrijving = (g.CijferKolom?.KolomOmschrijving || "").toLowerCase();
 
-      // KolomSoort 2 = calculated (eindcijfer, voortschrijdend gemiddelde, etc.)
       const isCalculated = kolomSoort === 2 ||
         kolomOmschrijving.includes("eindcijfer") ||
         kolomOmschrijving.includes("voortschrijdend") ||
         kolomOmschrijving.includes("gemiddelde");
-
-      if (isCalculated) {
-        summary.push({
-          subject: normalizeSubject(subjectRaw),
-          type: g.CijferKolom?.KolomOmschrijving || g.CijferKolom?.KolomKop || "Berekend",
-          grade: Math.round(gradeNum * 10) / 10,
-        });
-        continue;
-      }
 
       const dateStr = g.DatumIngevoerd
         ? new Date(g.DatumIngevoerd).toISOString().split("T")[0]
@@ -154,17 +144,23 @@ function parseStGradesFile(jsonStr: string): { grades: ParsedGrade[]; summary: {
 
       const description = g.CijferKolom?.KolomOmschrijving || g.CijferKolom?.KolomKop || "";
 
-      grades.push({
+      const parsed: ParsedGrade = {
         subject: normalizeSubject(subjectRaw),
         grade: Math.round(gradeNum * 10) / 10,
         description,
         date: dateStr,
-      });
+      };
+
+      if (isCalculated) {
+        finalGrades.push(parsed);
+      } else {
+        grades.push(parsed);
+      }
     }
 
-    return { grades, summary };
+    return { grades, finalGrades };
   } catch {
-    return { grades: [], summary: [] };
+    return { grades: [], finalGrades: [] };
   }
 }
 
@@ -177,7 +173,7 @@ gs 6,7 Duo-toets Grieken en Romeinen`;
 const MagisterImport = () => {
   const [text, setText] = useState("");
   const [parsedGrades, setParsedGrades] = useState<ParsedGrade[]>([]);
-  const [fileSummary, setFileSummary] = useState<{ subject: string; type: string; grade: number }[]>([]);
+  const [parsedFinalGrades, setParsedFinalGrades] = useState<ParsedGrade[]>([]);
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -208,15 +204,18 @@ const MagisterImport = () => {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const content = ev.target?.result as string;
-      const { grades, summary } = parseStGradesFile(content);
-      if (grades.length === 0) {
+      const { grades, finalGrades } = parseStGradesFile(content);
+      if (grades.length === 0 && finalGrades.length === 0) {
         toast.error("Geen geldige cijfers gevonden in dit bestand");
         return;
       }
       setParsedGrades(grades);
-      setFileSummary(summary);
+      setParsedFinalGrades(finalGrades);
       setResult(null);
-      toast.success(`${grades.length} cijfer(s) herkend uit bestand`);
+      const parts = [];
+      if (grades.length > 0) parts.push(`${grades.length} cijfer(s)`);
+      if (finalGrades.length > 0) parts.push(`${finalGrades.length} eindcijfer(s)`);
+      toast.success(`${parts.join(" en ")} herkend uit bestand`);
     };
     reader.readAsText(file);
     // Reset so same file can be selected again
@@ -231,24 +230,36 @@ const MagisterImport = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Je moet ingelogd zijn");
 
-      const gradeRows = parsedGrades.map((g) => ({
-        user_id: user.id,
-        subject: g.subject,
-        grade: g.grade,
-        description: g.description,
-        date: g.date,
-      }));
+      const allGrades = [
+        ...parsedGrades.map((g) => ({
+          user_id: user.id,
+          subject: g.subject,
+          grade: g.grade,
+          description: g.description,
+          date: g.date,
+          is_final_grade: false,
+        })),
+        ...parsedFinalGrades.map((g) => ({
+          user_id: user.id,
+          subject: g.subject,
+          grade: g.grade,
+          description: g.description,
+          date: g.date,
+          is_final_grade: true,
+        })),
+      ];
 
-      for (let i = 0; i < gradeRows.length; i += 100) {
-        const batch = gradeRows.slice(i, i + 100);
+      for (let i = 0; i < allGrades.length; i += 100) {
+        const batch = allGrades.slice(i, i + 100);
         const { error } = await supabase.from("grades").insert(batch);
         if (error) throw error;
       }
 
-      setResult(parsedGrades.length);
-      toast.success(`${parsedGrades.length} cijfer(s) geïmporteerd!`);
+      setResult(allGrades.length);
+      toast.success(`${allGrades.length} cijfer(s) geïmporteerd!`);
       qc.invalidateQueries({ queryKey: ["grades"] });
       setParsedGrades([]);
+      setParsedFinalGrades([]);
       setText("");
     } catch (err: any) {
       toast.error(err.message || "Import mislukt");
@@ -396,21 +407,20 @@ const MagisterImport = () => {
         </Card>
       )}
 
-      {/* Summary of skipped calculated grades */}
-      {fileSummary.length > 0 && parsedGrades.length > 0 && (
+      {/* Final grades preview */}
+      {parsedFinalGrades.length > 0 && (
         <Card className="mb-6">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Overgeslagen (berekend)</CardTitle>
+            <CardTitle className="text-base">Eindcijfers ({parsedFinalGrades.length})</CardTitle>
             <p className="text-xs text-muted-foreground">
-              Eindcijfers en gemiddelden worden niet geïmporteerd
+              Deze worden apart opgeslagen en getoond op de Cijfers-pagina
             </p>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
-              {fileSummary.map((s, i) => (
-                <div key={i} className="rounded-md bg-muted px-2.5 py-1 text-xs">
-                  <span className="font-medium">{s.subject}</span>{" "}
-                  <span className="text-muted-foreground">{s.grade} · {s.type}</span>
+              {parsedFinalGrades.map((g, i) => (
+                <div key={i} className={`rounded-md px-2.5 py-1.5 text-xs font-medium ${g.grade >= 5.5 ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"}`}>
+                  {g.subject}: {g.grade}
                 </div>
               ))}
             </div>

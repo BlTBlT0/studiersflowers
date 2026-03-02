@@ -2,14 +2,15 @@ import { useGrades, useGradeMutations } from "@/hooks/useSupabaseData";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trash2, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Trash2, TrendingUp, TrendingDown, Minus, Award } from "lucide-react";
 import { format } from "date-fns";
 import { nl } from "date-fns/locale";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, CartesianGrid, Cell } from "recharts";
 import { useState } from "react";
 
 const Grades = () => {
-  const { data: grades = [], isLoading } = useGrades();
+  const { data: grades = [], isLoading } = useGrades(false);
+  const { data: finalGrades = [], isLoading: finalLoading } = useGrades(true);
   const { deleteGrade } = useGradeMutations();
   const [filterSubject, setFilterSubject] = useState<string>("all");
 
@@ -48,7 +49,17 @@ const Grades = () => {
   const filtered = filterSubject === "all" ? grades : grades.filter((g) => g.subject === filterSubject);
   const sortedFiltered = [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  if (isLoading) return <div className="py-16 text-center text-muted-foreground">Laden...</div>;
+  if (isLoading || finalLoading) return <div className="py-16 text-center text-muted-foreground">Laden...</div>;
+
+  // Build final grades by subject (deduplicate, keep latest)
+  const finalBySubject = new Map<string, { grade: number; description: string; date: string; id: string }>();
+  finalGrades.forEach((g) => {
+    const existing = finalBySubject.get(g.subject);
+    if (!existing || new Date(g.date) > new Date(existing.date)) {
+      finalBySubject.set(g.subject, { grade: Number(g.grade), description: g.description || "", date: g.date, id: g.id });
+    }
+  });
+  const sortedFinal = Array.from(finalBySubject.entries()).sort((a, b) => a[0].localeCompare(b[0]));
 
   return (
     <div>
@@ -83,6 +94,33 @@ const Grades = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Eindcijfers */}
+      {sortedFinal.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Award size={16} className="text-primary" />
+              Eindcijfers
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+              {sortedFinal.map(([subj, data]) => (
+                <div
+                  key={subj}
+                  className={`rounded-lg p-3 text-center ${data.grade >= 5.5 ? "bg-primary/10" : "bg-destructive/10"}`}
+                >
+                  <p className="text-xs text-muted-foreground truncate">{subj}</p>
+                  <p className={`text-xl font-bold ${data.grade >= 5.5 ? "text-primary" : "text-destructive"}`}>
+                    {data.grade}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Bar chart of averages */}
       {averages.length > 0 && (
