@@ -85,34 +85,47 @@ async function magisterLogin(
   const mainHTML = await initRes.text();
 
   // 3. Extract authCode from the login page JavaScript
-  const jsPathMatch = mainHTML.match(/<script src="(.+?)"/);
-  if (!jsPathMatch) throw new Error("Kan login pagina niet parsen");
+  // Try multiple patterns to find the script tag
+  let jsPath = "";
+  const scriptPatterns = [
+    /<script src="([^"]+?)"\s*>/,
+    /<script[^>]+src="([^"]+\.js[^"]*)"/,
+    /src="(\/[^"]*bundle[^"]*\.js)"/,
+    /src="(\/[^"]*main[^"]*\.js)"/,
+    /src="(\/[^"]*app[^"]*\.js)"/,
+  ];
 
-  const jsUrl = `${authority}/${jsPathMatch[1]}`;
-  const js = await (await fetch(jsUrl)).text();
+  for (const pattern of scriptPatterns) {
+    const match = mainHTML.match(pattern);
+    if (match) {
+      jsPath = match[1];
+      break;
+    }
+  }
 
-  // Extract the authCode array from the JS
-  // The code contains something like: var n = [...].join("")
+  // If we can't find the JS, try to proceed without authCode
+  // Some versions of Magister don't require it
   let authCode = "";
-  try {
-    // Look for the challenge code pattern in the JS
-    const codeMatch = js.match(/\[([^\]]*"[^\]]*)\]\.join\(""\)/);
-    if (codeMatch) {
-      // Parse the array directly
-      const arrayStr = `[${codeMatch[1]}]`;
-      const arr = JSON.parse(arrayStr);
-      authCode = arr.join("");
-    } else {
-      // Fallback: try another pattern
-      const altMatch = js.match(/\.join\(""\)[,;]\s*\w+\s*=\s*(\[[^\]]+\])/);
-      if (altMatch) {
-        const arr = JSON.parse(altMatch[1]);
+
+  if (jsPath) {
+    const jsUrl = jsPath.startsWith("http") ? jsPath : `${authority}${jsPath.startsWith("/") ? "" : "/"}${jsPath}`;
+    const js = await (await fetch(jsUrl)).text();
+
+    // Extract the authCode array from the JS
+    try {
+      const codeMatch = js.match(/\[([^\]]*"[^\]]*)\]\.join\(""\)/);
+      if (codeMatch) {
+        const arrayStr = `[${codeMatch[1]}]`;
+        const arr = JSON.parse(arrayStr);
         authCode = arr.join("");
       }
+    } catch {
+      console.log("Could not extract authCode from JS, proceeding without it");
     }
-  } catch {
-    // If extraction fails, try with empty authCode
-    authCode = "";
+  } else {
+    console.log("No JS bundle found in login page, proceeding without authCode");
+    console.log("Login page URL:", initRes.url);
+    console.log("HTML preview:", mainHTML.substring(0, 500));
   }
 
   const returnUrl = genUrl("/connect/authorize/callback", queryParams);
