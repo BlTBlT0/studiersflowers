@@ -182,7 +182,7 @@ const MagisterImport = () => {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="font-display text-2xl font-bold">Cijfers Importeren</h1>
+        <h1 className="font-display text-2xl font-bold">Cijfer Import</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Typ je cijfers snel in — één per regel
         </p>

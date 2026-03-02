@@ -1,38 +1,17 @@
-import { useState } from "react";
 import { useGrades, useGradeMutations } from "@/hooks/useSupabaseData";
-import { SUBJECTS } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Trash2, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Trash2, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { format } from "date-fns";
 import { nl } from "date-fns/locale";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, CartesianGrid, Cell } from "recharts";
-import { toast } from "sonner";
+import { useState } from "react";
 
 const Grades = () => {
   const { data: grades = [], isLoading } = useGrades();
-  const { addGrade, deleteGrade } = useGradeMutations();
-  const [open, setOpen] = useState(false);
-  const [subject, setSubject] = useState("");
-  const [grade, setGrade] = useState("");
-  const [description, setDescription] = useState("");
-  const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const { deleteGrade } = useGradeMutations();
   const [filterSubject, setFilterSubject] = useState<string>("all");
-
-  const handleAdd = () => {
-    const num = parseFloat(grade);
-    if (!subject || isNaN(num) || num < 1 || num > 10) {
-      toast.error("Vul een geldig cijfer in (1-10)");
-      return;
-    }
-    addGrade.mutate({ subject, grade: num, date, description });
-    setOpen(false);
-    setGrade("");
-    setDescription("");
-  };
 
   // Compute averages per subject
   const subjectMap = new Map<string, number[]>();
@@ -73,28 +52,8 @@ const Grades = () => {
 
   return (
     <div>
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-6">
         <h1 className="font-display text-2xl font-bold">Cijfers</h1>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm"><Plus size={16} className="mr-1" /> Cijfer toevoegen</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Nieuw cijfer</DialogTitle></DialogHeader>
-            <div className="flex flex-col gap-3">
-              <Select value={subject} onValueChange={setSubject}>
-                <SelectTrigger><SelectValue placeholder="Vak" /></SelectTrigger>
-                <SelectContent>
-                  {SUBJECTS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Input type="number" step="0.1" min="1" max="10" placeholder="Cijfer (1-10)" value={grade} onChange={(e) => setGrade(e.target.value)} />
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-              <Input placeholder="Omschrijving (optioneel)" value={description} onChange={(e) => setDescription(e.target.value)} />
-              <Button onClick={handleAdd} disabled={addGrade.isPending}>Opslaan</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
       </div>
 
       {/* Overview cards */}
