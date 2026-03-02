@@ -299,18 +299,18 @@ Deno.serve(async (req) => {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { authorization: authHeader } } }
+      { global: { headers: { Authorization: authHeader } } }
     );
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
+    const token = authHeader.replace("Bearer ", "");
+    const { data, error: claimsError } = await supabase.auth.getClaims(token);
+    if (claimsError || !data?.claims) {
       return new Response(JSON.stringify({ error: "Niet ingelogd" }), {
         status: 401,
         headers: { ...corsHeaders, "content-type": "application/json" },
       });
     }
+    const userId = data.claims.sub as string;
 
     const body = await req.json();
     const { school, username, password, importGrades, importHomework } = body;
