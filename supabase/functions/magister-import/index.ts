@@ -84,7 +84,21 @@ async function magisterLogin(
   console.log("SessionId:", sessionId);
 
   // Read body to consume the response
-  const mainHTML = await initRes.text();
+  // Log HTML to find inline scripts or authCode data
+  console.log("HTML length:", mainHTML.length);
+  // Find inline script tags (no src attribute)
+  const inlineScripts = [...mainHTML.matchAll(/<script(?![^>]*src)[^>]*>([\s\S]*?)<\/script>/g)];
+  console.log("Inline scripts found:", inlineScripts.length);
+  for (const [, content] of inlineScripts) {
+    if (content.trim()) {
+      console.log("Inline script content:", content.substring(0, 500));
+    }
+  }
+  // Check for data attributes or hidden inputs
+  const dataAttrs = mainHTML.match(/data-[a-z-]+="[^"]*"/g);
+  if (dataAttrs) console.log("Data attributes:", dataAttrs.slice(0, 10));
+  const hiddenInputs = mainHTML.match(/<input[^>]*type="hidden"[^>]*>/g);
+  if (hiddenInputs) console.log("Hidden inputs:", hiddenInputs);
 
   // 3. Extract authCode from the login page JavaScript
   let authCode = "";
