@@ -230,24 +230,36 @@ const MagisterImport = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Je moet ingelogd zijn");
 
-      const gradeRows = parsedGrades.map((g) => ({
-        user_id: user.id,
-        subject: g.subject,
-        grade: g.grade,
-        description: g.description,
-        date: g.date,
-      }));
+      const allGrades = [
+        ...parsedGrades.map((g) => ({
+          user_id: user.id,
+          subject: g.subject,
+          grade: g.grade,
+          description: g.description,
+          date: g.date,
+          is_final_grade: false,
+        })),
+        ...parsedFinalGrades.map((g) => ({
+          user_id: user.id,
+          subject: g.subject,
+          grade: g.grade,
+          description: g.description,
+          date: g.date,
+          is_final_grade: true,
+        })),
+      ];
 
-      for (let i = 0; i < gradeRows.length; i += 100) {
-        const batch = gradeRows.slice(i, i + 100);
+      for (let i = 0; i < allGrades.length; i += 100) {
+        const batch = allGrades.slice(i, i + 100);
         const { error } = await supabase.from("grades").insert(batch);
         if (error) throw error;
       }
 
-      setResult(parsedGrades.length);
-      toast.success(`${parsedGrades.length} cijfer(s) geïmporteerd!`);
+      setResult(allGrades.length);
+      toast.success(`${allGrades.length} cijfer(s) geïmporteerd!`);
       qc.invalidateQueries({ queryKey: ["grades"] });
       setParsedGrades([]);
+      setParsedFinalGrades([]);
       setText("");
     } catch (err: any) {
       toast.error(err.message || "Import mislukt");
