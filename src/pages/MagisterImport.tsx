@@ -223,12 +223,23 @@ const MagisterImport = () => {
   };
 
   const handleImport = async () => {
-    if (parsedGrades.length === 0) return;
+    if (parsedGrades.length === 0 && parsedFinalGrades.length === 0) return;
     setImporting(true);
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Je moet ingelogd zijn");
+
+      // Fetch existing grades for duplicate detection
+      const { data: existingGrades } = await supabase
+        .from("grades")
+        .select("subject, grade, date, description, is_final_grade");
+
+      const existingSet = new Set(
+        (existingGrades || []).map((g) =>
+          `${g.subject}|${g.grade}|${g.date}|${g.description || ""}|${g.is_final_grade}`
+        )
+      );
 
       const allGrades = [
         ...parsedGrades.map((g) => ({
@@ -249,14 +260,29 @@ const MagisterImport = () => {
         })),
       ];
 
-      for (let i = 0; i < allGrades.length; i += 100) {
-        const batch = allGrades.slice(i, i + 100);
+      const newGrades = allGrades.filter(
+        (g) => !existingSet.has(`${g.subject}|${g.grade}|${g.date}|${g.description}|${g.is_final_grade}`)
+      );
+
+      const skipped = allGrades.length - newGrades.length;
+
+      if (newGrades.length === 0) {
+        toast.info("Alle cijfers bestaan al — niets geïmporteerd");
+        setImporting(false);
+        return;
+      }
+
+      for (let i = 0; i < newGrades.length; i += 100) {
+        const batch = newGrades.slice(i, i + 100);
         const { error } = await supabase.from("grades").insert(batch);
         if (error) throw error;
       }
 
-      setResult(allGrades.length);
-      toast.success(`${allGrades.length} cijfer(s) geïmporteerd!`);
+      setResult(newGrades.length);
+      const msg = skipped > 0
+        ? `${newGrades.length} cijfer(s) geïmporteerd, ${skipped} duplica(a)t(en) overgeslagen`
+        : `${newGrades.length} cijfer(s) geïmporteerd!`;
+      toast.success(msg);
       qc.invalidateQueries({ queryKey: ["grades"] });
       setParsedGrades([]);
       setParsedFinalGrades([]);
