@@ -91,9 +91,9 @@ const Grades = () => {
           <CardContent>
             <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={averages} margin={{ top: 5, right: 5, bottom: 5, left: -10 }}>
+                <BarChart data={averages} margin={{ top: 5, right: 5, bottom: 40, left: -10 }}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="subject" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                  <XAxis dataKey="subject" tick={{ fontSize: 10 }} className="fill-muted-foreground" angle={-45} textAnchor="end" interval={0} />
                   <YAxis domain={[0, 10]} tick={{ fontSize: 11 }} className="fill-muted-foreground" />
                   <Bar dataKey="average" radius={[4, 4, 0, 0]}>
                     {averages.map((entry) => (
