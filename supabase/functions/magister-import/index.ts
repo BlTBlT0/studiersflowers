@@ -100,11 +100,13 @@ async function magisterLogin(
       const js = await (await fetch(jsUrl)).text();
       console.log("JS file length:", js.length);
       
-      // Search for authCode-related patterns in the JS
-      // Log context around "authCode" mentions
-      const authCodeIdx = js.indexOf("authCode");
-      if (authCodeIdx >= 0) {
-        console.log("Found 'authCode' in JS at index", authCodeIdx, "context:", js.substring(Math.max(0, authCodeIdx - 50), authCodeIdx + 100));
+      // Search for ALL authCode mentions
+      let idx = 0;
+      let found = 0;
+      while ((idx = js.indexOf("authCode", idx)) !== -1 && found < 5) {
+        console.log(`authCode mention #${found} at ${idx}:`, js.substring(Math.max(0, idx - 100), idx + 100));
+        idx += 8;
+        found++;
       }
       
       // Also search for .join("") patterns
