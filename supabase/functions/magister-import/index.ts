@@ -84,6 +84,7 @@ async function magisterLogin(
   console.log("SessionId:", sessionId);
 
   // Read body to consume the response
+  const mainHTML = await initRes.text();
   // Log HTML to find inline scripts or authCode data
   console.log("HTML length:", mainHTML.length);
   // Find inline script tags (no src attribute)
