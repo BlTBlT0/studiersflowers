@@ -64,6 +64,28 @@ This project is built with:
 
 Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
 
+## Deploy on Vercel
+
+This app is ready to deploy on Vercel as a static Vite site.
+
+1. Import the repository into Vercel.
+2. Keep the default framework preset as `Vite`.
+3. Set these environment variables in the Vercel project settings:
+
+```sh
+VITE_SUPABASE_PROJECT_ID
+VITE_SUPABASE_PUBLISHABLE_KEY
+VITE_SUPABASE_URL
+```
+
+4. Deploy.
+
+The repo includes [vercel.json](/Users/thomwolf/Codex/Homwork_Planner/StudyFlow/studiersflowers/vercel.json) so client-side routes like `/planner` and `/grades` rewrite to `index.html` correctly.
+
+After deployment, open the public site on:
+- Android: Chrome -> `Install app`
+- iPhone: Safari -> `Share` -> `Add to Home Screen`
+
 ## Can I connect a custom domain to my Lovable project?
 
 Yes, you can!
