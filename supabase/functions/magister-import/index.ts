@@ -483,7 +483,7 @@ Deno.serve(async (req) => {
   } catch (err) {
     console.error("Magister import error:", err);
     return new Response(
-      JSON.stringify({ error: err.message || "Er ging iets mis" }),
+      JSON.stringify({ error: (err as Error).message || "Er ging iets mis" }),
       {
         status: 500,
         headers: { ...corsHeaders, "content-type": "application/json" },
