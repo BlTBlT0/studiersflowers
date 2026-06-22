@@ -75,7 +75,7 @@ async function magisterLogin(
   // 2. Init cookies - visit authorization endpoint, manually follow redirects to capture all cookies
   const authUrl = genUrl(endpoints.authorization_endpoint, queryParams);
   let currentUrl = authUrl;
-  let initRes: Response;
+  let initRes!: Response;
   for (let i = 0; i < 10; i++) {
     initRes = await fetch(currentUrl, { redirect: "manual" });
     jar.addFromHeaders(initRes.headers);
@@ -483,7 +483,7 @@ Deno.serve(async (req) => {
   } catch (err) {
     console.error("Magister import error:", err);
     return new Response(
-      JSON.stringify({ error: err.message || "Er ging iets mis" }),
+      JSON.stringify({ error: (err as Error).message || "Er ging iets mis" }),
       {
         status: 500,
         headers: { ...corsHeaders, "content-type": "application/json" },
