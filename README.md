@@ -86,6 +86,52 @@ After deployment, open the public site on:
 - Android: Chrome -> `Install app`
 - iPhone: Safari -> `Share` -> `Add to Home Screen`
 
+## Build desktop apps with Tauri
+
+This repo is also configured to build native desktop apps for macOS and Windows with Tauri.
+
+Prerequisites:
+
+- Node.js and npm
+- Rust toolchain (`rustup`, `cargo`, `rustc`)
+- On macOS: Xcode Command Line Tools
+- On Windows: Microsoft C++ Build Tools and WebView2
+
+Useful commands:
+
+```sh
+npm run tauri:dev
+npm run tauri:build
+```
+
+Build outputs are created under `src-tauri/target/release/bundle/`.
+
+Current verified output on this Mac:
+
+- `src-tauri/target/release/bundle/macos/StudyFlow.app`
+- `src-tauri/target/release/bundle/dmg/StudyFlow_0.0.0_aarch64.dmg`
+
+Windows builds:
+
+- A GitHub Actions workflow is included at [.github/workflows/desktop-build.yml](/Users/thomwolf/Codex/Homwork_Planner/StudyFlow/studiersflowers/.github/workflows/desktop-build.yml)
+- Before running it, add these GitHub repository secrets:
+  - `VITE_SUPABASE_PROJECT_ID`
+  - `VITE_SUPABASE_PUBLISHABLE_KEY`
+  - `VITE_SUPABASE_URL`
+- Then run the `desktop-build` workflow from the GitHub Actions tab to generate macOS and Windows bundles as artifacts.
+
+## Smart Priority Planner database update
+
+The Smart Priority Planner requires the latest Supabase migration:
+
+```sh
+npx supabase login
+npx supabase link --project-ref rrlounryfmkfujjxwjqn
+npx supabase db push
+```
+
+The migration adds smart task scores, planner settings, subjects, weather explanations, and locked/manual plan blocks without removing existing data.
+
 ## Can I connect a custom domain to my Lovable project?
 
 Yes, you can!

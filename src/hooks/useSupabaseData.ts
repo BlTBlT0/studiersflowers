@@ -31,6 +31,10 @@ export function useTaskMutations() {
     mutationFn: async (task: Omit<TablesInsert<"tasks">, "user_id">) => {
       const { error } = await supabase.from("tasks").insert({ ...task, user_id: user!.id });
       if (error) throw error;
+      await supabase.from("subjects").upsert(
+        { name: task.subject, user_id: user!.id },
+        { onConflict: "user_id,name" }
+      );
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks"] }),
     onError: (e) => toast.error(e.message),
@@ -40,6 +44,12 @@ export function useTaskMutations() {
     mutationFn: async ({ id, ...updates }: TablesUpdate<"tasks"> & { id: string }) => {
       const { error } = await supabase.from("tasks").update(updates).eq("id", id);
       if (error) throw error;
+      if (updates.subject) {
+        await supabase.from("subjects").upsert(
+          { name: updates.subject, user_id: user!.id },
+          { onConflict: "user_id,name" }
+        );
+      }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks"] }),
     onError: (e) => toast.error(e.message),
@@ -54,7 +64,62 @@ export function useTaskMutations() {
     onError: (e) => toast.error(e.message),
   });
 
-  return { addTask, updateTask, deleteTask };
+  const applyTaskScores = useMutation({
+    mutationFn: async (updates: Array<TablesUpdate<"tasks"> & { id: string }>) => {
+      const results = await Promise.all(
+        updates.map(({ id, ...values }) => supabase.from("tasks").update(values).eq("id", id))
+      );
+      const failed = results.find((result) => result.error);
+      if (failed?.error) throw failed.error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks"] }),
+    onError: (e) => toast.error(e.message),
+  });
+
+  return { addTask, updateTask, deleteTask, applyTaskScores };
+}
+
+// ---- SUBJECTS ----
+export type DbSubject = Tables<"subjects">;
+
+export function useSubjects() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["subjects", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("subjects").select("*").order("name");
+      if (error) throw error;
+      return data as DbSubject[];
+    },
+    enabled: !!user,
+  });
+}
+
+export function useSubjectMutations() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+
+  const addSubject = useMutation({
+    mutationFn: async (name: string) => {
+      const { error } = await supabase
+        .from("subjects")
+        .upsert({ name: name.trim(), user_id: user!.id }, { onConflict: "user_id,name" });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["subjects"] }),
+    onError: (e) => toast.error(e.message),
+  });
+
+  const deleteSubject = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("subjects").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["subjects"] }),
+    onError: (e) => toast.error(e.message),
+  });
+
+  return { addSubject, deleteSubject };
 }
 
 // ---- ACTIVITIES ----
@@ -161,8 +226,16 @@ export function usePlanBlockMutations() {
 
   const savePlan = useMutation({
     mutationFn: async (blocks: Omit<TablesInsert<"plan_blocks">, "user_id">[]) => {
-      // Delete old blocks first
-      const { error: delError } = await supabase.from("plan_blocks").delete().eq("user_id", user!.id);
+      const today = new Date().toISOString().slice(0, 10);
+      // Regeneration only replaces future generated work. User decisions remain intact.
+      const { error: delError } = await supabase
+        .from("plan_blocks")
+        .delete()
+        .eq("user_id", user!.id)
+        .eq("is_locked", false)
+        .eq("is_manual", false)
+        .eq("completed", false)
+        .gte("date", today);
       if (delError) throw delError;
       if (blocks.length > 0) {
         const { error } = await supabase
@@ -184,7 +257,18 @@ export function usePlanBlockMutations() {
     onError: (e) => toast.error(e.message),
   });
 
-  return { savePlan, updateBlock };
+  const addBlock = useMutation({
+    mutationFn: async (block: Omit<TablesInsert<"plan_blocks">, "user_id">) => {
+      const { error } = await supabase
+        .from("plan_blocks")
+        .insert({ ...block, user_id: user!.id });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["plan_blocks"] }),
+    onError: (e) => toast.error(e.message),
+  });
+
+  return { savePlan, updateBlock, addBlock };
 }
 
 // ---- TIME TRACKING ----
@@ -254,6 +338,10 @@ export function useGradeMutations() {
     mutationFn: async (grade: Omit<TablesInsert<"grades">, "user_id">) => {
       const { error } = await supabase.from("grades").insert({ ...grade, user_id: user!.id });
       if (error) throw error;
+      await supabase.from("subjects").upsert(
+        { name: grade.subject, user_id: user!.id },
+        { onConflict: "user_id,name" }
+      );
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["grades"] });
@@ -271,7 +359,19 @@ export function useGradeMutations() {
     onError: (e) => toast.error(e.message),
   });
 
-  return { addGrade, deleteGrade };
+  const updateGrade = useMutation({
+    mutationFn: async ({ id, ...updates }: TablesUpdate<"grades"> & { id: string }) => {
+      const { error } = await supabase.from("grades").update(updates).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["grades"] });
+      toast.success("Cijfer bijgewerkt");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  return { addGrade, updateGrade, deleteGrade };
 }
 
 // Helper: get average actual minutes per subject from tracking data

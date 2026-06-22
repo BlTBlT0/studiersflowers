@@ -15,6 +15,7 @@ import WeekCalendar from "./pages/WeekCalendar";
 import MagisterImport from "./pages/MagisterImport";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import SmartPlannerSettings from "./pages/SmartPlannerSettings";
 
 const queryClient = new QueryClient();
 
@@ -55,6 +56,7 @@ const App = () => (
                       <Route path="/stats" element={<Stats />} />
                       <Route path="/week" element={<WeekCalendar />} />
                       <Route path="/magister" element={<MagisterImport />} />
+                      <Route path="/smart-settings" element={<SmartPlannerSettings />} />
                       <Route path="*" element={<NotFound />} />
                     </Routes>
                   </Layout>

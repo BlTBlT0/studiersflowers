@@ -41,6 +41,27 @@ export type Database = {
         }
         Relationships: []
       }
+      subjects: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       grades: {
         Row: {
           created_at: string
@@ -82,11 +103,15 @@ export type Database = {
           end_time: string
           id: string
           is_break: boolean
+          is_locked: boolean
+          is_manual: boolean
+          smart_explanation: string
           start_time: string
           subject: string
           task_id: string | null
           task_title: string
           user_id: string
+          weather_impact: Json | null
         }
         Insert: {
           completed?: boolean
@@ -95,11 +120,15 @@ export type Database = {
           end_time: string
           id?: string
           is_break?: boolean
+          is_locked?: boolean
+          is_manual?: boolean
+          smart_explanation?: string
           start_time: string
           subject?: string
           task_id?: string | null
           task_title: string
           user_id: string
+          weather_impact?: Json | null
         }
         Update: {
           completed?: boolean
@@ -108,11 +137,15 @@ export type Database = {
           end_time?: string
           id?: string
           is_break?: boolean
+          is_locked?: boolean
+          is_manual?: boolean
+          smart_explanation?: string
           start_time?: string
           subject?: string
           task_id?: string | null
           task_title?: string
           user_id?: string
+          weather_impact?: Json | null
         }
         Relationships: [
           {
@@ -127,24 +160,57 @@ export type Database = {
       schedule_settings: {
         Row: {
           bedtime: string
+          break_length_minutes: number
           commute_minutes: number
+          grade_based_planning_enabled: boolean
           id: string
+          max_study_minutes_per_day: number
+          outdoor_preference: string
           school_end_times: Json
+          smart_priority_enabled: boolean
           user_id: string
+          wake_time: string
+          weather_planning_enabled: boolean
+          weekday_study_end: string
+          weekday_study_start: string
+          weekend_study_end: string
+          weekend_study_start: string
         }
         Insert: {
           bedtime?: string
+          break_length_minutes?: number
           commute_minutes?: number
+          grade_based_planning_enabled?: boolean
           id?: string
+          max_study_minutes_per_day?: number
+          outdoor_preference?: string
           school_end_times?: Json
+          smart_priority_enabled?: boolean
           user_id: string
+          wake_time?: string
+          weather_planning_enabled?: boolean
+          weekday_study_end?: string
+          weekday_study_start?: string
+          weekend_study_end?: string
+          weekend_study_start?: string
         }
         Update: {
           bedtime?: string
+          break_length_minutes?: number
           commute_minutes?: number
+          grade_based_planning_enabled?: boolean
           id?: string
+          max_study_minutes_per_day?: number
+          outdoor_preference?: string
           school_end_times?: Json
+          smart_priority_enabled?: boolean
           user_id?: string
+          wake_time?: string
+          weather_planning_enabled?: boolean
+          weekday_study_end?: string
+          weekday_study_start?: string
+          weekend_study_end?: string
+          weekend_study_start?: string
         }
         Relationships: []
       }
@@ -156,9 +222,15 @@ export type Database = {
           estimated_minutes: number
           id: string
           is_daily_practice: boolean
+          is_missing: boolean
           practice_frequency: number
           priority: string
+          priority_explanation: string
+          priority_mode: string
+          priority_score: number
+          smart_planning_enabled: boolean
           subject: string
+          task_type: string
           title: string
           user_id: string
         }
@@ -169,9 +241,15 @@ export type Database = {
           estimated_minutes?: number
           id?: string
           is_daily_practice?: boolean
+          is_missing?: boolean
           practice_frequency?: number
           priority?: string
+          priority_explanation?: string
+          priority_mode?: string
+          priority_score?: number
+          smart_planning_enabled?: boolean
           subject: string
+          task_type?: string
           title: string
           user_id: string
         }
@@ -182,9 +260,15 @@ export type Database = {
           estimated_minutes?: number
           id?: string
           is_daily_practice?: boolean
+          is_missing?: boolean
           practice_frequency?: number
           priority?: string
+          priority_explanation?: string
+          priority_mode?: string
+          priority_score?: number
+          smart_planning_enabled?: boolean
           subject?: string
+          task_type?: string
           title?: string
           user_id?: string
         }

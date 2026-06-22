@@ -43,8 +43,15 @@ const Index = () => {
     const endH = Math.floor(endMins / 60);
     const endM = endMins % 60;
     const newEndTime = `${endH.toString().padStart(2, "0")}:${endM.toString().padStart(2, "0")}`;
-    updateBlock.mutate({ id, date: newDate, start_time: newStartTime, end_time: newEndTime });
-    toast.success("Blok verplaatst!");
+    updateBlock.mutate({
+      id,
+      date: newDate,
+      start_time: newStartTime,
+      end_time: newEndTime,
+      is_manual: true,
+      is_locked: true,
+    });
+    toast.success("Blok verplaatst en vergrendeld!");
   };
 
   const handleTimerComplete = (block: DbPlanBlock, actualMinutes: number) => {
@@ -55,6 +62,11 @@ const Index = () => {
       actual_minutes: actualMinutes,
     });
     toast.success(`${actualMinutes} minuten geregistreerd!`);
+  };
+
+  const toggleLock = (id: string) => {
+    const block = planBlocks.find((item) => item.id === id);
+    if (block) updateBlock.mutate({ id, is_locked: !block.is_locked });
   };
 
   return (
@@ -103,6 +115,8 @@ const Index = () => {
               onToggle={toggleBlock}
               onMove={moveBlock}
               onTimerComplete={handleTimerComplete}
+              onLock={toggleLock}
+              priorityScore={tasks.find((task) => task.id === block.task_id)?.priority_score}
             />
           ))}
         </div>

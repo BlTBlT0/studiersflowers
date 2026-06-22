@@ -1,13 +1,30 @@
 export type Priority = "low" | "medium" | "high";
-export type Weekday = "monday" | "tuesday" | "wednesday" | "thursday" | "friday";
+export type Weekday =
+  | "monday"
+  | "tuesday"
+  | "wednesday"
+  | "thursday"
+  | "friday"
+  | "saturday"
+  | "sunday";
 
-export const WEEKDAYS: Weekday[] = ["monday", "tuesday", "wednesday", "thursday", "friday"];
+export const WEEKDAYS: Weekday[] = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday",
+];
 export const WEEKDAY_LABELS: Record<Weekday, string> = {
   monday: "Ma",
   tuesday: "Di",
   wednesday: "Wo",
   thursday: "Do",
   friday: "Vr",
+  saturday: "Za",
+  sunday: "Zo",
 };
 
 export interface Task {

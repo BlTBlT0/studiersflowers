@@ -1,25 +1,29 @@
-import { DbTask, DbActivity, DbPlanBlock, DbTimeTracking, getSubjectAverages } from "@/hooks/useSupabaseData";
-import { format, addDays, startOfDay } from "date-fns";
-import type { TablesInsert } from "@/integrations/supabase/types";
+import { addDays, differenceInCalendarDays, format, parseISO, startOfDay } from "date-fns";
+import type {
+  DbActivity,
+  DbGrade,
+  DbPlanBlock,
+  DbTask,
+  DbTimeTracking,
+} from "@/hooks/useSupabaseData";
+import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
+import { calculatePriority, getSubjectGradeAverages } from "@/lib/smartPriority";
+import { getWeatherImpact, type WeatherForecast } from "@/lib/weather";
 
-function timeToMinutes(time: string): number {
-  const [h, m] = time.slice(0, 5).split(":").map(Number);
-  return h * 60 + m;
-}
-
-function minutesToTime(mins: number): string {
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
-}
-
-type Weekday = "monday" | "tuesday" | "wednesday" | "thursday" | "friday";
-const WEEKDAYS: Weekday[] = ["monday", "tuesday", "wednesday", "thursday", "friday"];
-
-function getWeekday(date: Date): Weekday | null {
-  const day = date.getDay();
-  if (day === 0 || day === 6) return null;
-  return WEEKDAYS[day - 1];
+export interface SmartPlannerSettings {
+  schoolEndTimes: Record<string, string>;
+  bedtime: string;
+  commuteMinutes: number;
+  smartPriorityEnabled: boolean;
+  gradeBasedPlanningEnabled: boolean;
+  weekdayStudyStart: string;
+  weekdayStudyEnd: string;
+  weekendStudyStart: string;
+  weekendStudyEnd: string;
+  wakeTime: string;
+  maxStudyMinutesPerDay: number;
+  breakLengthMinutes: number;
+  outdoorPreference: string;
 }
 
 interface TimeSlot {
@@ -27,321 +31,374 @@ interface TimeSlot {
   end: number;
 }
 
-function getAvailableSlots(
-  date: Date,
-  schoolEndTimes: Record<string, string>,
-  bedtime: string,
-  commuteMinutes: number,
-  activities: DbActivity[]
-): TimeSlot[] {
-  const weekday = getWeekday(date);
-  if (!weekday) return [];
-
-  const schoolEnd = timeToMinutes(schoolEndTimes[weekday] || "15:30") + (commuteMinutes || 0);
-  const bed = timeToMinutes(bedtime || "21:30");
-
-  if (schoolEnd >= bed) return [];
-
-  const dayActivities = activities
-    .filter((a) => a.weekday === weekday)
-    .map((a) => ({ start: timeToMinutes(a.start_time), end: timeToMinutes(a.end_time) }))
-    .sort((a, b) => a.start - b.start);
-
-  const slots: TimeSlot[] = [];
-  let cursor = schoolEnd;
-
-  for (const act of dayActivities) {
-    if (act.start > cursor) {
-      slots.push({ start: cursor, end: Math.min(act.start, bed) });
-    }
-    cursor = Math.max(cursor, act.end);
-  }
-
-  if (cursor < bed) {
-    slots.push({ start: cursor, end: bed });
-  }
-
-  return slots;
+interface DayPlan {
+  date: Date;
+  dateStr: string;
+  slots: TimeSlot[];
+  totalMinutes: number;
+  usedMinutes: number;
 }
 
 interface TaskChunk {
-  taskId: string;
-  taskTitle: string;
-  subject: string;
+  task: DbTask;
   minutes: number;
+  score: number;
+  explanation: string;
+  targetDate?: string;
 }
 
-function splitIntoChunks(task: DbTask, adjustedMinutes: number): TaskChunk[] {
-  const chunks: TaskChunk[] = [];
-  let remaining = adjustedMinutes;
+export interface SmartPlanResult {
+  blocks: Omit<TablesInsert<"plan_blocks">, "user_id">[];
+  taskUpdates: Array<TablesUpdate<"tasks"> & { id: string }>;
+  unscheduledTaskIds: string[];
+}
 
-  if (remaining <= 45) {
-    chunks.push({ taskId: task.id, taskTitle: task.title, subject: task.subject, minutes: remaining });
+export function isPreservedPlanBlock(block: DbPlanBlock, today: string): boolean {
+  return block.date < today || block.completed || block.is_locked || block.is_manual;
+}
+
+const DAY_NAMES = [
+  "sunday",
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+];
+
+function timeToMinutes(time: string): number {
+  const [hours, minutes] = time.slice(0, 5).split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+function minutesToTime(minutes: number): string {
+  const normalized = Math.max(0, Math.min(minutes, 24 * 60 - 1));
+  const hours = Math.floor(normalized / 60);
+  const rest = normalized % 60;
+  return `${hours.toString().padStart(2, "0")}:${rest.toString().padStart(2, "0")}`;
+}
+
+function subtractInterval(slots: TimeSlot[], blocked: TimeSlot): TimeSlot[] {
+  return slots.flatMap((slot) => {
+    if (blocked.end <= slot.start || blocked.start >= slot.end) return [slot];
+    const pieces: TimeSlot[] = [];
+    if (blocked.start > slot.start) pieces.push({ start: slot.start, end: blocked.start });
+    if (blocked.end < slot.end) pieces.push({ start: blocked.end, end: slot.end });
+    return pieces;
+  });
+}
+
+function getDaySlots(
+  date: Date,
+  settings: SmartPlannerSettings,
+  activities: DbActivity[],
+  preservedBlocks: DbPlanBlock[],
+  now: Date
+): TimeSlot[] {
+  const dayName = DAY_NAMES[date.getDay()];
+  const weekend = date.getDay() === 0 || date.getDay() === 6;
+  const dateStr = format(date, "yyyy-MM-dd");
+  const preferredStart = timeToMinutes(
+    weekend ? settings.weekendStudyStart : settings.weekdayStudyStart
+  );
+  const preferredEnd = timeToMinutes(
+    weekend ? settings.weekendStudyEnd : settings.weekdayStudyEnd
+  );
+  const sleepEnd = timeToMinutes(settings.bedtime);
+  let start = preferredStart;
+  const end = Math.min(preferredEnd, sleepEnd);
+
+  if (!weekend) {
+    const schoolEnd = timeToMinutes(settings.schoolEndTimes[dayName] || "15:30");
+    start = Math.max(start, schoolEnd + settings.commuteMinutes);
   } else {
-    while (remaining > 0) {
-      const chunk = remaining > 45 ? 35 : remaining;
-      chunks.push({ taskId: task.id, taskTitle: task.title, subject: task.subject, minutes: Math.min(chunk, 45) });
-      remaining -= chunk;
+    start = Math.max(start, timeToMinutes(settings.wakeTime));
+  }
+
+  if (dateStr === format(now, "yyyy-MM-dd")) {
+    start = Math.max(start, now.getHours() * 60 + now.getMinutes());
+  }
+  if (start >= end) return [];
+
+  let slots: TimeSlot[] = [{ start, end }];
+  for (const activity of activities.filter((item) => item.weekday === dayName)) {
+    slots = subtractInterval(slots, {
+      start: timeToMinutes(activity.start_time),
+      end: timeToMinutes(activity.end_time),
+    });
+  }
+  for (const block of preservedBlocks.filter((item) => item.date === dateStr)) {
+    slots = subtractInterval(slots, {
+      start: timeToMinutes(block.start_time),
+      end: timeToMinutes(block.end_time),
+    });
+  }
+  return slots.filter((slot) => slot.end - slot.start >= 10);
+}
+
+function splitDuration(minutes: number): number[] {
+  if (minutes <= 45) return [Math.max(10, minutes)];
+  const count = Math.ceil(minutes / 45);
+  const base = Math.floor(minutes / count);
+  let remainder = minutes - base * count;
+  return Array.from({ length: count }, () => base + (remainder-- > 0 ? 1 : 0));
+}
+
+function createChunks(task: DbTask, score: number, explanation: string, dayPlans: DayPlan[]): TaskChunk[] {
+  if (!task.is_daily_practice) {
+    return splitDuration(task.estimated_minutes).map((minutes) => ({
+      task,
+      minutes,
+      score,
+      explanation,
+    }));
+  }
+
+  const eligibleDays = dayPlans.filter((day) => day.dateStr < task.due_date);
+  const requested = task.practice_frequency || eligibleDays.length;
+  const count = Math.min(requested, eligibleDays.length);
+  if (count === 0) return [];
+  const step = eligibleDays.length / count;
+  return Array.from({ length: count }, (_, index) => {
+    const dayIndex = Math.min(eligibleDays.length - 1, Math.floor(index * step + step / 2));
+    return {
+      task,
+      minutes: Math.max(5, task.estimated_minutes),
+      score,
+      explanation,
+      targetDate: eligibleDays[dayIndex].dateStr,
+    };
+  });
+}
+
+function totalAvailableBefore(dayPlans: DayPlan[], deadline: string): number {
+  return dayPlans
+    .filter((day) => day.dateStr < deadline)
+    .reduce((sum, day) => sum + day.totalMinutes, 0);
+}
+
+function workloadBefore(tasks: DbTask[], deadline: string): number {
+  return tasks
+    .filter((task) => !task.completed && task.smart_planning_enabled && task.due_date <= deadline)
+    .reduce((sum, task) => sum + task.estimated_minutes, 0);
+}
+
+function consumeSlot(
+  day: DayPlan,
+  slotIndex: number,
+  duration: number,
+  breakMinutes: number
+): { start: number; hasBreak: boolean } {
+  const slot = day.slots[slotIndex];
+  const start = slot.start;
+  const hasBreak = slot.end - start - duration >= breakMinutes;
+  const consumed = duration + (hasBreak ? breakMinutes : 0);
+  slot.start += consumed;
+  if (slot.end - slot.start < 10) day.slots.splice(slotIndex, 1);
+  return { start, hasBreak };
+}
+
+export function generateSmartPlan(
+  tasks: DbTask[],
+  grades: DbGrade[],
+  activities: DbActivity[],
+  preservedBlocks: DbPlanBlock[],
+  settings: SmartPlannerSettings,
+  weather?: WeatherForecast,
+  startDate = new Date()
+): SmartPlanResult {
+  const now = startDate;
+  const today = startOfDay(now);
+  const dayPlans: DayPlan[] = [];
+  for (let index = 0; index < 14; index++) {
+    const date = addDays(today, index);
+    const slots = getDaySlots(date, settings, activities, preservedBlocks, now);
+    const totalMinutes = slots.reduce((sum, slot) => sum + slot.end - slot.start, 0);
+    dayPlans.push({
+      date,
+      dateStr: format(date, "yyyy-MM-dd"),
+      slots,
+      totalMinutes,
+      usedMinutes: 0,
+    });
+  }
+
+  const activeTasks = tasks.filter((task) => !task.completed && task.smart_planning_enabled);
+  const subjectGrades = getSubjectGradeAverages(grades);
+  const scoredTasks = activeTasks.map((task) => {
+    const result = calculatePriority(task, subjectGrades[task.subject], {
+      now,
+      smartPriorityEnabled: settings.smartPriorityEnabled,
+      gradeBasedPlanning: settings.gradeBasedPlanningEnabled,
+      availableMinutesBeforeDeadline: totalAvailableBefore(dayPlans, task.due_date),
+      workloadMinutesBeforeDeadline: workloadBefore(activeTasks, task.due_date),
+    });
+    return { task, result };
+  });
+
+  const taskUpdates = scoredTasks.map(({ task, result }) => ({
+    id: task.id,
+    priority_score: result.score,
+    priority: result.level,
+    priority_explanation: result.explanation,
+  }));
+
+  const chunks = scoredTasks
+    .flatMap(({ task, result }) => createChunks(task, result.score, result.explanation, dayPlans))
+    .sort((left, right) => {
+      if (right.score !== left.score) return right.score - left.score;
+      return left.task.due_date.localeCompare(right.task.due_date);
+    });
+
+  const blocks: Omit<TablesInsert<"plan_blocks">, "user_id">[] = [];
+  const unscheduled = new Set<string>();
+
+  const pendingChunks = [...chunks];
+  while (pendingChunks.length > 0) {
+    const chunk = pendingChunks.shift()!;
+    const overdue = differenceInCalendarDays(parseISO(chunk.task.due_date), today) <= 0;
+    const candidates: Array<{
+      dayIndex: number;
+      slotIndex: number;
+      duration: number;
+      value: number;
+      impact: ReturnType<typeof getWeatherImpact>;
+    }> = [];
+
+    dayPlans.forEach((day, dayIndex) => {
+      if (chunk.targetDate && day.dateStr !== chunk.targetDate) return;
+      if (!overdue && day.dateStr >= chunk.task.due_date) return;
+      const remainingDaily = settings.maxStudyMinutesPerDay - day.usedMinutes;
+      if (remainingDaily < 10) return;
+
+      day.slots.forEach((slot, slotIndex) => {
+        const duration = Math.min(chunk.minutes, remainingDaily, slot.end - slot.start);
+        if (duration < 10) return;
+        const impact = getWeatherImpact(
+          weather,
+          day.dateStr,
+          Math.floor(slot.start / 60),
+          chunk.score,
+          settings.outdoorPreference
+        );
+        const weatherAdjustment = chunk.score >= 80
+          ? Math.min(0, impact.adjustment)
+          : impact.adjustment;
+        candidates.push({
+          dayIndex,
+          slotIndex,
+          duration,
+          impact,
+          value: -dayIndex * 8 - slot.start / 180 + weatherAdjustment,
+        });
+      });
+    });
+
+    candidates.sort((a, b) => b.value - a.value);
+    const selected = candidates[0];
+    if (!selected) {
+      unscheduled.add(chunk.task.id);
+      continue;
+    }
+
+    const day = dayPlans[selected.dayIndex];
+    const { start, hasBreak } = consumeSlot(
+      day,
+      selected.slotIndex,
+      selected.duration,
+      settings.breakLengthMinutes
+    );
+    day.usedMinutes += selected.duration;
+    const weatherReason = selected.impact.reason;
+    const explanation = weatherReason
+      ? `${chunk.explanation} ${weatherReason}`
+      : chunk.explanation;
+
+    blocks.push({
+      task_id: chunk.task.id,
+      task_title: chunk.task.is_daily_practice ? `${chunk.task.title} 📖` : chunk.task.title,
+      subject: chunk.task.subject,
+      date: day.dateStr,
+      start_time: minutesToTime(start),
+      end_time: minutesToTime(start + selected.duration),
+      duration_minutes: selected.duration,
+      completed: false,
+      is_break: false,
+      is_locked: false,
+      is_manual: false,
+      smart_explanation: explanation,
+      weather_impact: selected.impact.reason ? selected.impact : null,
+    });
+
+    if (selected.duration < chunk.minutes) {
+      pendingChunks.unshift({ ...chunk, minutes: chunk.minutes - selected.duration });
+    }
+
+    if (settings.breakLengthMinutes > 0 && hasBreak) {
+      blocks.push({
+        task_id: null,
+        task_title: "Pauze 🧃",
+        subject: "",
+        date: day.dateStr,
+        start_time: minutesToTime(start + selected.duration),
+        end_time: minutesToTime(start + selected.duration + settings.breakLengthMinutes),
+        duration_minutes: settings.breakLengthMinutes,
+        completed: false,
+        is_break: true,
+        is_locked: false,
+        is_manual: false,
+        smart_explanation: "Herstelpauze tussen studieblokken.",
+        weather_impact: null,
+      });
     }
   }
 
-  return chunks;
+  return {
+    blocks: blocks.sort((a, b) => `${a.date}${a.start_time}`.localeCompare(`${b.date}${b.start_time}`)),
+    taskUpdates,
+    unscheduledTaskIds: [...unscheduled],
+  };
 }
 
+// Backward-compatible wrapper used by older callers.
 export function generatePlan(
   tasks: DbTask[],
   activities: DbActivity[],
   schoolEndTimes: Record<string, string>,
   bedtime: string,
   commuteMinutes: number,
-  tracking: DbTimeTracking[] = [],
+  _tracking: DbTimeTracking[] = [],
   startDate?: Date
 ): Omit<TablesInsert<"plan_blocks">, "user_id">[] {
-  const now = startDate || new Date();
-  const today = startOfDay(now);
-  const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
-  const subjectAverages = getSubjectAverages(tracking);
-
-  const priorityOrder: Record<string, number> = { high: 3, medium: 2, low: 1 };
-  
-  // Separate daily practice tasks from regular tasks
-  const dailyPracticeTasks = tasks.filter((t) => !t.completed && t.is_daily_practice);
-  const regularTasks = tasks.filter((t) => !t.completed && !t.is_daily_practice);
-  
-  const incompleteTasks = regularTasks
-    .sort((a, b) => {
-      const dateCompare = a.due_date.localeCompare(b.due_date);
-      if (dateCompare !== 0) return dateCompare;
-      return (priorityOrder[b.priority] || 2) - (priorityOrder[a.priority] || 2);
-    });
-
-  // Calculate total available minutes over 14 days
-  const MAX_DAYS = 14;
-  const daySlots: { date: Date; dateStr: string; slots: TimeSlot[]; totalMinutes: number }[] = [];
-  for (let i = 0; i < MAX_DAYS; i++) {
-    const d = addDays(today, i);
-    const dateStr = format(d, "yyyy-MM-dd");
-    let slots = getAvailableSlots(d, schoolEndTimes, bedtime, commuteMinutes, activities);
-
-    if (i === 0) {
-      slots = slots
-        .map((s) => ({ start: Math.max(s.start, currentTimeMinutes), end: s.end }))
-        .filter((s) => s.end > s.start);
-    }
-
-    const totalMinutes = slots.reduce((sum, s) => sum + (s.end - s.start), 0);
-    if (totalMinutes > 0) daySlots.push({ date: d, dateStr, slots, totalMinutes });
-  }
-
-  // Calculate total study needed for regular tasks
-  const allChunks: TaskChunk[] = [];
-  for (const task of incompleteTasks) {
-    const adjusted = subjectAverages[task.subject]
-      ? Math.round((subjectAverages[task.subject] / task.estimated_minutes) * task.estimated_minutes)
-      : task.estimated_minutes;
-    allChunks.push(...splitIntoChunks(task, Math.max(adjusted, task.estimated_minutes)));
-  }
-
-  const totalStudyMinutes = allChunks.reduce((s, c) => s + c.minutes, 0);
-  const totalAvailable = daySlots.reduce((s, d) => s + d.totalMinutes, 0);
-
-  // Target: spread evenly, but respect deadlines
-  const daysWithTime = daySlots.length;
-  const targetPerDay = daysWithTime > 0 ? Math.ceil(totalStudyMinutes / daysWithTime) : 90;
-  // Ensure we can fit all tasks: minimum 45 min/day, max 90 min/day
-  const MAX_STUDY_PER_DAY = 90;
-  const maxPerDay = Math.min(Math.max(targetPerDay, 45), MAX_STUDY_PER_DAY);
-
-  const blocks: Omit<TablesInsert<"plan_blocks">, "user_id">[] = [];
-  const remainingChunks = [...allChunks];
-
-  // Schedule chunks respecting deadlines: for each day, pick chunks whose deadline >= this day
-  for (const dayInfo of daySlots) {
-    if (remainingChunks.length === 0) break;
-
-    let studyMinutesThisDay = 0;
-    let studyMinutesSinceBreak = 0;
-
-    // Find chunks that MUST be done by today or soon (deadline pressure)
-    // and chunks that CAN be done today
-    const eligibleIndices: number[] = [];
-    for (let i = 0; i < remainingChunks.length; i++) {
-      eligibleIndices.push(i);
-    }
-
-    // Sort eligible chunks: urgent first (closest deadline), then by priority
-    eligibleIndices.sort((a, b) => {
-      const chunkA = remainingChunks[a];
-      const chunkB = remainingChunks[b];
-      const taskA = incompleteTasks.find(t => t.id === chunkA.taskId);
-      const taskB = incompleteTasks.find(t => t.id === chunkB.taskId);
-      const deadlineA = taskA?.due_date || "9999-12-31";
-      const deadlineB = taskB?.due_date || "9999-12-31";
-      const dateCompare = deadlineA.localeCompare(deadlineB);
-      if (dateCompare !== 0) return dateCompare;
-      return (priorityOrder[taskB?.priority || "medium"] || 2) - (priorityOrder[taskA?.priority || "medium"] || 2);
-    });
-
-    // Only schedule chunks that have deadline >= today (don't skip past-deadline tasks, still schedule them ASAP)
-    // Prioritize chunks whose deadline is soon
-    const scheduledIndices: number[] = [];
-
-    for (const idx of eligibleIndices) {
-      if (studyMinutesThisDay >= maxPerDay) break;
-
-      const chunk = remainingChunks[idx];
-      const task = incompleteTasks.find(t => t.id === chunk.taskId);
-      const deadline = task?.due_date || "9999-12-31";
-
-      // Deadline means: must be DONE BEFORE that date (not on that date)
-      // Task must be scheduled on days STRICTLY BEFORE the deadline
-      const todayStr = format(today, "yyyy-MM-dd");
-      const isOverdue = deadline <= todayStr; // deadline already passed or is today
-      
-      if (dayInfo.dateStr >= deadline && !isOverdue) {
-        // This day is on or after the deadline - too late to work on it
-        continue;
-      }
-
-      // Spread load: if we've done enough for today, defer non-urgent tasks
-      if (!isOverdue && deadline > dayInfo.dateStr && studyMinutesThisDay >= Math.floor(maxPerDay * 0.6)) {
-        continue;
-      }
-
-      // Find a slot to place this chunk
-      let placed = false;
-      for (const slot of dayInfo.slots) {
-        if (placed) break;
-        // Calculate cursor based on already-placed blocks for this day
-        let cursor = slot.start;
-        for (const b of blocks) {
-          if (b.date === dayInfo.dateStr) {
-            const bEnd = timeToMinutes(b.end_time);
-            if (bEnd > cursor && timeToMinutes(b.start_time) < slot.end) {
-              cursor = Math.max(cursor, bEnd);
-            }
-          }
-        }
-
-        if (cursor >= slot.end) continue;
-
-        // Insert break if needed
-        if (studyMinutesSinceBreak >= 40) {
-          const breakEnd = Math.min(cursor + 10, slot.end);
-          if (breakEnd > cursor) {
-            blocks.push({
-              task_id: null,
-              task_title: "Pauze 🧃",
-              subject: "",
-              date: dayInfo.dateStr,
-              start_time: minutesToTime(cursor),
-              end_time: minutesToTime(breakEnd),
-              duration_minutes: breakEnd - cursor,
-              completed: false,
-              is_break: true,
-            });
-            cursor = breakEnd;
-            studyMinutesSinceBreak = 0;
-          }
-        }
-
-        const available = Math.min(slot.end - cursor, maxPerDay - studyMinutesThisDay);
-        if (available < 10) continue;
-
-        const duration = Math.min(chunk.minutes, available);
-        blocks.push({
-          task_id: chunk.taskId,
-          task_title: chunk.taskTitle,
-          subject: chunk.subject,
-          date: dayInfo.dateStr,
-          start_time: minutesToTime(cursor),
-          end_time: minutesToTime(cursor + duration),
-          duration_minutes: duration,
-          completed: false,
-          is_break: false,
-        });
-
-        studyMinutesThisDay += duration;
-        studyMinutesSinceBreak += duration;
-
-        if (duration >= chunk.minutes) {
-          scheduledIndices.push(idx);
-        } else {
-          remainingChunks[idx] = { ...chunk, minutes: chunk.minutes - duration };
-        }
-        placed = true;
-      }
-    }
-
-    // Remove scheduled chunks (in reverse order to preserve indices)
-    for (const idx of scheduledIndices.sort((a, b) => b - a)) {
-      remainingChunks.splice(idx, 1);
-    }
-  }
-
-  // Schedule daily practice tasks with frequency support
-  for (const task of dailyPracticeTasks) {
-    const deadlineStr = task.due_date;
-    const sessionDuration = task.estimated_minutes || 5;
-    const frequency = (task as any).practice_frequency || 0; // 0 = every day
-
-    // Collect eligible days (before deadline)
-    const eligibleDays = daySlots.filter((d) => d.dateStr < deadlineStr);
-    if (eligibleDays.length === 0) continue;
-
-    // Determine which days to schedule on
-    let scheduleDays: typeof eligibleDays;
-    if (frequency === 0 || frequency >= eligibleDays.length) {
-      // Every day
-      scheduleDays = eligibleDays;
-    } else {
-      // Spread N sessions evenly across available days
-      scheduleDays = [];
-      const step = eligibleDays.length / frequency;
-      for (let i = 0; i < frequency; i++) {
-        const idx = Math.min(Math.round(i * step + step / 2), eligibleDays.length - 1);
-        if (!scheduleDays.includes(eligibleDays[idx])) {
-          scheduleDays.push(eligibleDays[idx]);
-        }
-      }
-    }
-
-    for (const dayInfo of scheduleDays) {
-      // Find first available slot for the practice block
-      for (const slot of dayInfo.slots) {
-        let cursor = slot.start;
-        for (const b of blocks) {
-          if (b.date === dayInfo.dateStr) {
-            const bEnd = timeToMinutes(b.end_time);
-            if (bEnd > cursor && timeToMinutes(b.start_time) < slot.end) {
-              cursor = Math.max(cursor, bEnd);
-            }
-          }
-        }
-        if (cursor + sessionDuration <= slot.end) {
-          blocks.push({
-            task_id: task.id,
-            task_title: `${task.title} 📖`,
-            subject: task.subject,
-            date: dayInfo.dateStr,
-            start_time: minutesToTime(cursor),
-            end_time: minutesToTime(cursor + sessionDuration),
-            duration_minutes: sessionDuration,
-            completed: false,
-            is_break: false,
-          });
-          break;
-        }
-      }
-    }
-  }
-
-  return blocks;
+  return generateSmartPlan(
+    tasks,
+    [],
+    activities,
+    [],
+    {
+      schoolEndTimes,
+      bedtime,
+      commuteMinutes,
+      smartPriorityEnabled: false,
+      gradeBasedPlanningEnabled: false,
+      weekdayStudyStart: "16:00",
+      weekdayStudyEnd: bedtime,
+      weekendStudyStart: "10:00",
+      weekendStudyEnd: "18:00",
+      wakeTime: "07:00",
+      maxStudyMinutesPerDay: 90,
+      breakLengthMinutes: 10,
+      outdoorPreference: "balanced",
+    },
+    undefined,
+    startDate
+  ).blocks;
 }
 
 export function getTodayBlocks(blocks: DbPlanBlock[]): DbPlanBlock[] {
   const today = format(new Date(), "yyyy-MM-dd");
-  return blocks.filter((b) => b.date === today);
+  return blocks.filter((block) => block.date === today);
 }
 
 export function getAvailableMinutesForDate(
@@ -351,6 +408,21 @@ export function getAvailableMinutesForDate(
   commuteMinutes: number,
   activities: DbActivity[]
 ): number {
-  const slots = getAvailableSlots(date, schoolEndTimes, bedtime, commuteMinutes, activities);
-  return slots.reduce((sum, s) => sum + (s.end - s.start), 0);
+  const settings: SmartPlannerSettings = {
+    schoolEndTimes,
+    bedtime,
+    commuteMinutes,
+    smartPriorityEnabled: true,
+    gradeBasedPlanningEnabled: true,
+    weekdayStudyStart: "16:00",
+    weekdayStudyEnd: bedtime,
+    weekendStudyStart: "10:00",
+    weekendStudyEnd: "18:00",
+    wakeTime: "07:00",
+    maxStudyMinutesPerDay: 90,
+    breakLengthMinutes: 10,
+    outdoorPreference: "balanced",
+  };
+  return getDaySlots(date, settings, activities, [], new Date())
+    .reduce((sum, slot) => sum + slot.end - slot.start, 0);
 }

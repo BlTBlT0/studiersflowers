@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { SUBJECTS } from "@/types";
+import { useSubjects } from "@/hooks/useSupabaseData";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,38 +9,56 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus } from "lucide-react";
 
-type Priority = "low" | "medium" | "high";
+type PriorityMode = "automatic" | "low" | "medium" | "high";
 
-interface TaskFormData {
+export interface TaskFormData {
   title: string;
   subject: string;
   due_date: string;
   estimated_minutes: number;
   priority: string;
+  priority_mode: string;
+  task_type: string;
+  is_missing: boolean;
+  smart_planning_enabled: boolean;
   is_daily_practice: boolean;
   practice_frequency: number;
 }
 
 interface TaskFormProps {
   onSave: (task: TaskFormData) => void;
-  initial?: { title: string; subject: string; due_date: string; estimated_minutes: number; priority: string; is_daily_practice?: boolean; practice_frequency?: number };
+  initial?: Partial<TaskFormData> & {
+    title: string;
+    subject: string;
+    due_date: string;
+    estimated_minutes: number;
+    priority: string;
+  };
   trigger?: React.ReactNode;
 }
 
-const PRIORITY_LABELS: Record<Priority, string> = {
+const PRIORITY_LABELS: Record<PriorityMode, string> = {
+  automatic: "automatisch",
   low: "laag",
   medium: "gemiddeld",
   high: "hoog",
 };
 
 export function TaskForm({ onSave, initial, trigger }: TaskFormProps) {
+  const { data: customSubjects = [] } = useSubjects();
+  const subjects = [...new Set([...SUBJECTS, ...customSubjects.map((item) => item.name)])].sort();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState(initial?.title || "");
   const [subject, setSubject] = useState(initial?.subject || "");
   const [dueDate, setDueDate] = useState(initial?.due_date || "");
   const [estimatedMinutes, setEstimatedMinutes] = useState(initial?.estimated_minutes?.toString() || "30");
   const [unknownTime, setUnknownTime] = useState(initial?.estimated_minutes === 30 && !initial?.title);
-  const [priority, setPriority] = useState<Priority>((initial?.priority as Priority) || "medium");
+  const [priorityMode, setPriorityMode] = useState<PriorityMode>(
+    (initial?.priority_mode as PriorityMode) || "automatic"
+  );
+  const [taskType, setTaskType] = useState(initial?.task_type || "homework");
+  const [isMissing, setIsMissing] = useState(initial?.is_missing || false);
+  const [smartPlanningEnabled, setSmartPlanningEnabled] = useState(initial?.smart_planning_enabled ?? true);
   const [isDailyPractice, setIsDailyPractice] = useState(initial?.is_daily_practice || false);
   const [practiceFrequency, setPracticeFrequency] = useState(initial?.practice_frequency || 0); // 0 = elke dag
 
@@ -51,7 +70,11 @@ export function TaskForm({ onSave, initial, trigger }: TaskFormProps) {
       subject,
       due_date: dueDate,
       estimated_minutes: unknownTime ? 30 : (parseInt(estimatedMinutes) || 30),
-      priority,
+      priority: priorityMode === "automatic" ? "medium" : priorityMode,
+      priority_mode: priorityMode,
+      task_type: taskType,
+      is_missing: isMissing,
+      smart_planning_enabled: smartPlanningEnabled,
       is_daily_practice: isDailyPractice,
       practice_frequency: isDailyPractice ? practiceFrequency : 0,
     });
@@ -62,7 +85,10 @@ export function TaskForm({ onSave, initial, trigger }: TaskFormProps) {
       setDueDate("");
       setEstimatedMinutes("30");
       setUnknownTime(false);
-      setPriority("medium");
+      setPriorityMode("automatic");
+      setTaskType("homework");
+      setIsMissing(false);
+      setSmartPlanningEnabled(true);
       setIsDailyPractice(false);
       setPracticeFrequency(0);
     }
@@ -92,9 +118,21 @@ export function TaskForm({ onSave, initial, trigger }: TaskFormProps) {
             <Select value={subject} onValueChange={setSubject}>
               <SelectTrigger><SelectValue placeholder="Kies een vak" /></SelectTrigger>
               <SelectContent>
-                {SUBJECTS.map((s) => (
+                {subjects.map((s) => (
                   <SelectItem key={s} value={s}>{s}</SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Taaktype</Label>
+            <Select value={taskType} onValueChange={setTaskType}>
+              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="homework">Huiswerk</SelectItem>
+                <SelectItem value="test">Toets</SelectItem>
+                <SelectItem value="project">Project</SelectItem>
+                <SelectItem value="revision">Herhalen</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -116,6 +154,19 @@ export function TaskForm({ onSave, initial, trigger }: TaskFormProps) {
             <Checkbox checked={isDailyPractice} onCheckedChange={(c) => setIsDailyPractice(!!c)} />
             <span className="text-sm">Dagelijks oefenen</span>
           </label>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label className="flex cursor-pointer items-center gap-2 rounded-lg border p-3">
+              <Checkbox checked={isMissing} onCheckedChange={(checked) => setIsMissing(!!checked)} />
+              <span className="text-sm">Ontbrekend huiswerk</span>
+            </label>
+            <label className="flex cursor-pointer items-center gap-2 rounded-lg border p-3">
+              <Checkbox
+                checked={smartPlanningEnabled}
+                onCheckedChange={(checked) => setSmartPlanningEnabled(!!checked)}
+              />
+              <span className="text-sm">Slim inplannen</span>
+            </label>
+          </div>
           {isDailyPractice && (
             <div className="ml-6 flex flex-col gap-3">
               <div>
@@ -172,12 +223,12 @@ export function TaskForm({ onSave, initial, trigger }: TaskFormProps) {
           <div>
             <Label>Prioriteit</Label>
             <div className="mt-1 flex gap-2">
-              {(["low", "medium", "high"] as Priority[]).map((p) => (
+              {(["automatic", "low", "medium", "high"] as PriorityMode[]).map((p) => (
                 <button
                   key={p}
                   type="button"
-                  onClick={() => setPriority(p)}
-                  className={`priority-${p} rounded-full border px-3 py-1 text-xs font-medium capitalize transition-all ${priority === p ? "ring-2 ring-offset-1 ring-current" : "opacity-60"}`}
+                  onClick={() => setPriorityMode(p)}
+                  className={`${p === "automatic" ? "bg-primary/10 text-primary border-primary/30" : `priority-${p}`} rounded-full border px-3 py-1 text-xs font-medium capitalize transition-all ${priorityMode === p ? "ring-2 ring-offset-1 ring-current" : "opacity-60"}`}
                 >
                   {PRIORITY_LABELS[p]}
                 </button>

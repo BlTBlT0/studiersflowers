@@ -1,23 +1,27 @@
-import { useTasks, useTaskMutations } from "@/hooks/useSupabaseData";
+import { useTasks, useTaskMutations, usePlanBlockMutations, useGrades, useScheduleSettings } from "@/hooks/useSupabaseData";
 import { TaskForm } from "@/components/TaskForm";
 import { TaskCard } from "@/components/TaskCard";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Search, Sparkles, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { calculatePriority, getSubjectGradeAverages } from "@/lib/smartPriority";
 
 const Homework = () => {
   const { data: tasks = [], isLoading } = useTasks();
+  const { data: grades = [] } = useGrades();
+  const { data: plannerSettings } = useScheduleSettings();
   const { addTask, updateTask, deleteTask } = useTaskMutations();
+  const { addBlock } = usePlanBlockMutations();
   const [search, setSearch] = useState("");
   const [aiText, setAiText] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
 
-  const handleAdd = (data: { title: string; subject: string; due_date: string; estimated_minutes: number; priority: string; is_daily_practice: boolean; practice_frequency: number }) => {
+  const handleAdd = (data: Parameters<typeof addTask.mutate>[0]) => {
     addTask.mutate(data);
   };
 
@@ -30,8 +34,31 @@ const Homework = () => {
     deleteTask.mutate(id);
   };
 
-  const handleEdit = (id: string, data: { title: string; subject: string; due_date: string; estimated_minutes: number; priority: string; is_daily_practice: boolean }) => {
+  const handleEdit = (id: string, data: Parameters<typeof addTask.mutate>[0]) => {
     updateTask.mutate({ id, ...data });
+  };
+
+  const handleManualPlan = (taskId: string, date: string, startTime: string) => {
+    const task = tasks.find((item) => item.id === taskId);
+    if (!task) return;
+    const [hours, minutes] = startTime.split(":").map(Number);
+    const end = hours * 60 + minutes + task.estimated_minutes;
+    addBlock.mutate({
+      task_id: task.id,
+      task_title: task.title,
+      subject: task.subject,
+      date,
+      start_time: startTime,
+      end_time: `${Math.floor(end / 60).toString().padStart(2, "0")}:${(end % 60).toString().padStart(2, "0")}`,
+      duration_minutes: task.estimated_minutes,
+      completed: false,
+      is_break: false,
+      is_locked: true,
+      is_manual: true,
+      smart_explanation: "Handmatig ingepland en vergrendeld.",
+      weather_impact: null,
+    });
+    toast.success("Taak handmatig ingepland en vergrendeld");
   };
 
   const handleAiParse = async () => {
@@ -57,6 +84,10 @@ const Homework = () => {
           due_date: t.due_date,
           estimated_minutes: t.estimated_minutes || 30,
           priority: t.priority || "medium",
+          priority_mode: "automatic",
+          task_type: t.task_type || "homework",
+          is_missing: false,
+          smart_planning_enabled: true,
           is_daily_practice: t.is_daily_practice || false,
         });
       }
@@ -64,14 +95,37 @@ const Homework = () => {
       toast.success(`${parsedTasks.length} ${parsedTasks.length === 1 ? "taak" : "taken"} toegevoegd!`);
       setAiText("");
       setAiOpen(false);
-    } catch (e: any) {
-      toast.error(e.message || "Er ging iets mis met AI");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Er ging iets mis met AI");
     } finally {
       setAiLoading(false);
     }
   };
 
-  const filtered = tasks.filter(
+  const scoredTasks = useMemo(() => {
+    const averages = getSubjectGradeAverages(grades);
+    return tasks.map((task) => {
+      const days = Math.max(1, Math.ceil((new Date(task.due_date).getTime() - Date.now()) / 86_400_000));
+      const available = days * (plannerSettings?.max_study_minutes_per_day ?? 90);
+      const workload = tasks
+        .filter((item) => !item.completed && item.due_date <= task.due_date)
+        .reduce((sum, item) => sum + item.estimated_minutes, 0);
+      const result = calculatePriority(task, averages[task.subject], {
+        smartPriorityEnabled: plannerSettings?.smart_priority_enabled ?? true,
+        gradeBasedPlanning: plannerSettings?.grade_based_planning_enabled ?? true,
+        availableMinutesBeforeDeadline: available,
+        workloadMinutesBeforeDeadline: workload,
+      });
+      return {
+        ...task,
+        priority_score: result.score,
+        priority: result.level,
+        priority_explanation: result.explanation,
+      };
+    });
+  }, [grades, plannerSettings, tasks]);
+
+  const filtered = scoredTasks.filter(
     (t) =>
       t.title.toLowerCase().includes(search.toLowerCase()) ||
       t.subject.toLowerCase().includes(search.toLowerCase())
@@ -126,7 +180,7 @@ const Homework = () => {
 
       <div className="flex flex-col gap-2">
         {incomplete.map((task) => (
-          <TaskCard key={task.id} task={task} onToggle={handleToggle} onDelete={handleDelete} onEdit={handleEdit} />
+          <TaskCard key={task.id} task={task} onToggle={handleToggle} onDelete={handleDelete} onEdit={handleEdit} onManualPlan={handleManualPlan} />
         ))}
       </div>
 
@@ -137,7 +191,7 @@ const Homework = () => {
           </h3>
           <div className="flex flex-col gap-2">
             {completed.map((task) => (
-              <TaskCard key={task.id} task={task} onToggle={handleToggle} onDelete={handleDelete} onEdit={handleEdit} />
+              <TaskCard key={task.id} task={task} onToggle={handleToggle} onDelete={handleDelete} onEdit={handleEdit} onManualPlan={handleManualPlan} />
             ))}
           </div>
         </div>

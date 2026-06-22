@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Check, Coffee, GripVertical, MoveHorizontal, Play, Square } from "lucide-react";
+import { useRef, useState } from "react";
+import { Check, Coffee, GripVertical, MoveHorizontal, Play, Square, Lock, Unlock, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,9 +14,11 @@ interface TimelineBlockProps {
   onToggle: (id: string) => void;
   onMove?: (id: string, newDate: string, newStartTime: string) => void;
   onTimerComplete?: (block: DbPlanBlock, actualMinutes: number) => void;
+  onLock?: (id: string) => void;
+  priorityScore?: number;
 }
 
-export function TimelineBlock({ block, onToggle, onMove, onTimerComplete }: TimelineBlockProps) {
+export function TimelineBlock({ block, onToggle, onMove, onTimerComplete, onLock, priorityScore }: TimelineBlockProps) {
   const [moveOpen, setMoveOpen] = useState(false);
   const [newDate, setNewDate] = useState(block.date);
   const [newTime, setNewTime] = useState(block.start_time.slice(0, 5));
@@ -24,6 +26,7 @@ export function TimelineBlock({ block, onToggle, onMove, onTimerComplete }: Time
   const [timerRunning, setTimerRunning] = useState(false);
   const [timerStart, setTimerStart] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const {
     attributes,
@@ -32,7 +35,7 @@ export function TimelineBlock({ block, onToggle, onMove, onTimerComplete }: Time
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: block.id });
+  } = useSortable({ id: block.id, disabled: block.is_locked || block.is_break });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -46,12 +49,13 @@ export function TimelineBlock({ block, onToggle, onMove, onTimerComplete }: Time
     const interval = setInterval(() => {
       setElapsed(Math.floor((Date.now() - start) / 1000));
     }, 1000);
-    (window as any).__sf_timer = interval;
+    timerRef.current = interval;
   };
 
   const stopTimer = () => {
     setTimerRunning(false);
-    clearInterval((window as any).__sf_timer);
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = null;
     const actualMinutes = Math.max(1, Math.round(elapsed / 60));
     if (onTimerComplete) onTimerComplete(block, actualMinutes);
     setElapsed(0);
@@ -83,7 +87,7 @@ export function TimelineBlock({ block, onToggle, onMove, onTimerComplete }: Time
       )}
     >
       {/* Drag handle */}
-      {!block.is_break && (
+      {!block.is_break && !block.is_locked && (
         <button
           {...attributes}
           {...listeners}
@@ -109,6 +113,7 @@ export function TimelineBlock({ block, onToggle, onMove, onTimerComplete }: Time
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           {block.is_break && <Coffee size={14} className="text-accent" />}
+          {block.is_locked && <Lock size={13} className="text-primary" />}
           <span className={cn("text-sm font-medium", block.completed && "line-through")}>
             {block.is_break ? "Pauze 🧃" : block.task_title}
           </span>
@@ -117,11 +122,28 @@ export function TimelineBlock({ block, onToggle, onMove, onTimerComplete }: Time
               {formatElapsed(elapsed)}
             </span>
           )}
+          {block.is_manual && (
+            <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] text-secondary-foreground">handmatig</span>
+          )}
+          {priorityScore != null && (
+            <span className={cn(
+              "rounded-full border px-1.5 py-0.5 text-[10px] font-bold",
+              priorityScore >= 70 ? "priority-high" : priorityScore >= 40 ? "priority-medium" : "priority-low"
+            )}>
+              {priorityScore}
+            </span>
+          )}
         </div>
         {!block.is_break && (
           <span className="text-xs text-muted-foreground">
             {block.subject} · {block.duration_minutes} min
           </span>
+        )}
+        {block.smart_explanation && !block.is_break && (
+          <p className="mt-1 flex items-start gap-1 text-[11px] leading-relaxed text-muted-foreground">
+            <Info size={11} className="mt-0.5 shrink-0" />
+            {block.smart_explanation}
+          </p>
         )}
       </div>
 
@@ -164,6 +186,16 @@ export function TimelineBlock({ block, onToggle, onMove, onTimerComplete }: Time
                 </div>
               </DialogContent>
             </Dialog>
+          )}
+
+          {onLock && !block.completed && (
+            <button
+              onClick={() => onLock(block.id)}
+              className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+              title={block.is_locked ? "Ontgrendelen" : "Vergrendelen"}
+            >
+              {block.is_locked ? <Unlock size={14} /> : <Lock size={14} />}
+            </button>
           )}
 
           <button

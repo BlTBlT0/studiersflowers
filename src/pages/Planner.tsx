@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { useTasks, useActivities, useScheduleSettings, usePlanBlocks, usePlanBlockMutations, useTimeTracking, useTimeTrackingMutations, DbPlanBlock } from "@/hooks/useSupabaseData";
-import { generatePlan } from "@/lib/planner";
+import { useTasks, useTaskMutations, useActivities, useScheduleSettings, usePlanBlocks, usePlanBlockMutations, useTimeTrackingMutations, DbPlanBlock, useGrades } from "@/hooks/useSupabaseData";
+import { generateSmartPlan, isPreservedPlanBlock, type SmartPlannerSettings } from "@/lib/planner";
+import { loadWeatherForecast } from "@/lib/weather";
 import { TimelineBlock } from "@/components/TimelineBlock";
 import { Button } from "@/components/ui/button";
 import { Wand2, CalendarDays } from "lucide-react";
@@ -26,13 +27,15 @@ import {
 
 const Planner = () => {
   const { data: tasks = [] } = useTasks();
+  const { applyTaskScores } = useTaskMutations();
+  const { data: grades = [] } = useGrades();
   const { data: activities = [] } = useActivities();
   const { data: dbSettings } = useScheduleSettings();
   const { data: planBlocks = [] } = usePlanBlocks();
   const { savePlan, updateBlock } = usePlanBlockMutations();
-  const { data: tracking = [] } = useTimeTracking();
   const { addTracking } = useTimeTrackingMutations();
   const [activeBlock, setActiveBlock] = useState<DbPlanBlock | null>(null);
+  const [generating, setGenerating] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -45,15 +48,52 @@ const Planner = () => {
   const bedtime = dbSettings?.bedtime?.slice(0, 5) || "21:30";
   const commuteMinutes = dbSettings?.commute_minutes ?? 15;
 
-  const handleGenerate = () => {
+  const plannerSettings: SmartPlannerSettings = {
+    schoolEndTimes,
+    bedtime,
+    commuteMinutes,
+    smartPriorityEnabled: dbSettings?.smart_priority_enabled ?? true,
+    gradeBasedPlanningEnabled: dbSettings?.grade_based_planning_enabled ?? true,
+    weekdayStudyStart: dbSettings?.weekday_study_start?.slice(0, 5) || "16:00",
+    weekdayStudyEnd: dbSettings?.weekday_study_end?.slice(0, 5) || bedtime,
+    weekendStudyStart: dbSettings?.weekend_study_start?.slice(0, 5) || "10:00",
+    weekendStudyEnd: dbSettings?.weekend_study_end?.slice(0, 5) || "18:00",
+    wakeTime: dbSettings?.wake_time?.slice(0, 5) || "07:00",
+    maxStudyMinutesPerDay: dbSettings?.max_study_minutes_per_day ?? 90,
+    breakLengthMinutes: dbSettings?.break_length_minutes ?? 10,
+    outdoorPreference: dbSettings?.outdoor_preference || "balanced",
+  };
+
+  const handleGenerate = async () => {
     const incompleteTasks = tasks.filter((t) => !t.completed);
     if (incompleteTasks.length === 0) {
       toast.error("Geen openstaande taken om in te plannen!");
       return;
     }
-    const blocks = generatePlan(tasks, activities, schoolEndTimes, bedtime, commuteMinutes, tracking);
-    savePlan.mutate(blocks);
-    toast.success(`Plan gegenereerd met ${blocks.length} blokken!`);
+    setGenerating(true);
+    try {
+      const weather = dbSettings?.weather_planning_enabled
+        ? await loadWeatherForecast(true)
+        : undefined;
+      const today = new Date().toISOString().slice(0, 10);
+      const preservedBlocks = planBlocks.filter((block) => isPreservedPlanBlock(block, today));
+      const result = generateSmartPlan(
+        tasks,
+        grades,
+        activities,
+        preservedBlocks,
+        plannerSettings,
+        weather
+      );
+      await applyTaskScores.mutateAsync(result.taskUpdates);
+      await savePlan.mutateAsync(result.blocks);
+      if (result.unscheduledTaskIds.length > 0) {
+        toast.warning(`${result.unscheduledTaskIds.length} taak/taken pasten niet vóór de deadline.`);
+      }
+      toast.success(`Slim plan gegenereerd met ${result.blocks.filter((block) => !block.is_break).length} studieblokken.`);
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const toggleBlock = (id: string) => {
@@ -72,8 +112,20 @@ const Planner = () => {
     const endH = Math.floor(endMins / 60);
     const endM = endMins % 60;
     const newEndTime = `${endH.toString().padStart(2, "0")}:${endM.toString().padStart(2, "0")}`;
-    updateBlock.mutate({ id, date: newDate, start_time: newStartTime, end_time: newEndTime });
-    toast.success("Blok verplaatst!");
+    updateBlock.mutate({
+      id,
+      date: newDate,
+      start_time: newStartTime,
+      end_time: newEndTime,
+      is_manual: true,
+      is_locked: true,
+    });
+    toast.success("Blok verplaatst en vergrendeld!");
+  };
+
+  const toggleLock = (id: string) => {
+    const block = planBlocks.find((item) => item.id === id);
+    if (block) updateBlock.mutate({ id, is_locked: !block.is_locked });
   };
 
   const handleTimerComplete = (block: DbPlanBlock, actualMinutes: number) => {
@@ -117,9 +169,9 @@ const Planner = () => {
     <div>
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="font-display text-2xl font-bold">Planner</h1>
-        <Button onClick={handleGenerate} className="gap-2" disabled={savePlan.isPending}>
+        <Button onClick={handleGenerate} className="gap-2" disabled={generating}>
           <Wand2 size={16} />
-          {savePlan.isPending ? "Bezig..." : "Plan genereren"}
+          {generating ? "Slim plan maken..." : "Generate Smart Plan"}
         </Button>
       </div>
 
@@ -149,6 +201,8 @@ const Planner = () => {
                         onToggle={toggleBlock}
                         onMove={moveBlock}
                         onTimerComplete={handleTimerComplete}
+                        onLock={toggleLock}
+                        priorityScore={tasks.find((task) => task.id === block.task_id)?.priority_score}
                       />
                     ))}
                   </div>

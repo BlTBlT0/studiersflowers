@@ -11,6 +11,7 @@ import { Plus, Trash2, Clock, Home } from "lucide-react";
 const DEFAULT_SCHOOL_END_TIMES = {
   monday: "15:30", tuesday: "15:30", wednesday: "15:30", thursday: "15:30", friday: "15:30",
 };
+const SCHOOL_DAYS: Weekday[] = ["monday", "tuesday", "wednesday", "thursday", "friday"];
 
 const Schedule = () => {
   const { data: dbSettings, isLoading } = useScheduleSettings();
@@ -74,7 +75,7 @@ const Schedule = () => {
           Schooltijden (einde)
         </h2>
         <div className="grid gap-3 sm:grid-cols-5">
-          {WEEKDAYS.map((day) => (
+          {SCHOOL_DAYS.map((day) => (
             <div key={day} className="rounded-xl border bg-card p-3">
               <Label className="text-xs text-muted-foreground">{WEEKDAY_LABELS[day]}</Label>
               <Input

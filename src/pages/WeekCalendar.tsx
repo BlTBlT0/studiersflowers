@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { usePlanBlocks, useActivities } from "@/hooks/useSupabaseData";
+import { usePlanBlocks, useActivities, useTasks } from "@/hooks/useSupabaseData";
 import { Card, CardContent } from "@/components/ui/card";
 import { CalendarDays } from "lucide-react";
 import { format, startOfWeek, addDays } from "date-fns";
@@ -51,11 +51,16 @@ interface Block {
   endMin: number;
   colorClass: string;
   completed?: boolean;
+  locked?: boolean;
+  manual?: boolean;
+  explanation?: string;
+  priorityScore?: number;
 }
 
 const WeekCalendar = () => {
   const { data: planBlocks = [] } = usePlanBlocks();
   const { data: activities = [] } = useActivities();
+  const { data: tasks = [] } = useTasks();
 
   const weekStart = useMemo(() => startOfWeek(new Date(), { weekStartsOn: 1 }), []);
   const weekDates = useMemo(() => Array.from({ length: 5 }, (_, i) => addDays(weekStart, i)), [weekStart]);
@@ -78,6 +83,10 @@ const WeekCalendar = () => {
           endMin: timeToMinutes(pb.end_time),
           colorClass,
           completed: pb.completed,
+          locked: pb.is_locked,
+          manual: pb.is_manual,
+          explanation: pb.smart_explanation,
+          priorityScore: tasks.find((task) => task.id === pb.task_id)?.priority_score,
         });
       }
 
@@ -95,7 +104,7 @@ const WeekCalendar = () => {
 
       return { date, dateStr, blocks };
     });
-  }, [weekDates, planBlocks, activities]);
+  }, [weekDates, planBlocks, activities, tasks]);
 
   return (
     <div>
@@ -183,11 +192,16 @@ const WeekCalendar = () => {
                         key={block.id}
                         className={`absolute left-1 right-1 overflow-hidden rounded-md border px-1.5 py-0.5 text-[11px] leading-tight ${block.colorClass} ${block.completed ? "opacity-50 line-through" : ""}`}
                         style={{ top, height: Math.max(height, 18) }}
-                        title={`${block.title}${block.subtitle ? ` — ${block.subtitle}` : ""}`}
+                        title={`${block.title}${block.subtitle ? ` — ${block.subtitle}` : ""}${block.explanation ? `\n${block.explanation}` : ""}`}
                       >
-                        <div className="font-medium truncate">{block.title}</div>
+                        <div className="font-medium truncate">
+                          {block.locked ? "🔒 " : ""}{block.manual ? "✋ " : ""}{block.title}
+                        </div>
                         {block.subtitle && height > 28 && (
                           <div className="truncate opacity-70">{block.subtitle}</div>
+                        )}
+                        {block.priorityScore != null && height > 42 && (
+                          <div className="mt-0.5 text-[10px] font-bold">Score {block.priorityScore}</div>
                         )}
                       </div>
                     );
