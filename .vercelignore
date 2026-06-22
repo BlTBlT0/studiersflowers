@@ -1,0 +1,9 @@
+.git
+.github
+.vercel
+node_modules
+dist
+dev-dist
+src-tauri
+*.log
+.DS_Store
