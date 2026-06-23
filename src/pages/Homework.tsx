@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Search, Sparkles, Loader2 } from "lucide-react";
+import { Search, Sparkles, Loader2, Camera, Mic, MicOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { calculatePriority, getSubjectGradeAverages } from "@/lib/smartPriority";
@@ -21,6 +21,12 @@ const Homework = () => {
   const [aiText, setAiText] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
+  const [photoLoading, setPhotoLoading] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const recorderRef = useState<MediaRecorder | null>(null as MediaRecorder | null)[0] as unknown as { current: MediaRecorder | null };
+  // Use a plain object as a ref-like holder without importing useRef:
+  // (Using useState for chunks below.)
 
   const handleAdd = (data: Parameters<typeof addTask.mutate>[0]) => {
     addTask.mutate(data);
@@ -116,6 +122,98 @@ const Homework = () => {
     }
   };
 
+  const importParsedTasks = (parsedTasks: Array<{ title: string; subject: string; due_date: string; estimated_minutes?: number; priority?: "low"|"medium"|"high"; task_type?: string; is_daily_practice?: boolean; }>) => {
+    if (!Array.isArray(parsedTasks) || parsedTasks.length === 0) {
+      toast.error("Kon geen taken herkennen");
+      return;
+    }
+    for (const t of parsedTasks) {
+      addTask.mutate({
+        title: t.title,
+        subject: t.subject,
+        due_date: t.due_date,
+        estimated_minutes: t.estimated_minutes || 30,
+        priority: t.priority || "medium",
+        priority_mode: "automatic",
+        task_type: (t.task_type as "homework" | "test" | "presentation" | "essay" | "project") || "homework",
+        is_missing: false,
+        smart_planning_enabled: true,
+        is_daily_practice: t.is_daily_practice || false,
+      });
+    }
+    toast.success(`${parsedTasks.length} ${parsedTasks.length === 1 ? "taak" : "taken"} toegevoegd!`);
+  };
+
+  const handlePhoto = async (file: File) => {
+    setPhotoLoading(true);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const { data, error } = await supabase.functions.invoke("photo-to-task", { body: { image: base64 } });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      importParsedTasks(data.tasks);
+      setAiOpen(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Foto verwerken mislukt");
+    } finally {
+      setPhotoLoading(false);
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = ["audio/webm", "audio/mp4"].find((t) => MediaRecorder.isTypeSupported(t)) || "audio/webm";
+      const rec = new MediaRecorder(stream, { mimeType });
+      const chunks: Blob[] = [];
+      rec.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+      rec.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        setRecording(false);
+        const blob = new Blob(chunks, { type: rec.mimeType });
+        if (blob.size < 1024) { toast.error("Opname te kort, probeer opnieuw."); return; }
+        setTranscribing(true);
+        try {
+          const base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              const result = reader.result as string;
+              resolve(result.split(",")[1]);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+          const { data, error } = await supabase.functions.invoke("transcribe-audio", {
+            body: { audio: base64, mimeType: rec.mimeType },
+          });
+          if (error) throw error;
+          if (data?.error) throw new Error(data.error);
+          setAiText((prev) => (prev ? prev + " " : "") + (data.text || ""));
+          toast.success("Opname omgezet naar tekst");
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : "Transcriptie mislukt");
+        } finally {
+          setTranscribing(false);
+        }
+      };
+      rec.start();
+      (recorderRef as { current: MediaRecorder | null }).current = rec;
+      setRecording(true);
+    } catch {
+      toast.error("Microfoontoegang geweigerd");
+    }
+  };
+
+  const stopRecording = () => {
+    const rec = (recorderRef as { current: MediaRecorder | null }).current;
+    if (rec && rec.state !== "inactive") rec.stop();
+  };
+
   const scoredTasks = useMemo(() => {
     const averages = getSubjectGradeAverages(grades);
     return tasks.map((task) => {
@@ -165,7 +263,7 @@ const Homework = () => {
       {aiOpen && (
         <div className="mb-4 rounded-lg border bg-card p-4">
           <p className="mb-2 text-sm text-muted-foreground">
-            Typ je huiswerk in gewone taal, bijv. <em>"Wiskunde blz 42-45 af voor donderdag"</em>
+            Typ, spreek in, of upload een foto van je agenda/schoolbord.
           </p>
           <Textarea
             placeholder="Typ je huiswerk hier..."
@@ -173,7 +271,34 @@ const Homework = () => {
             onChange={(e) => setAiText(e.target.value)}
             rows={3}
           />
-          <div className="mt-2 flex justify-end">
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap gap-2">
+              <label className="inline-flex">
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePhoto(f); e.target.value = ""; }}
+                />
+                <Button asChild size="sm" variant="outline" disabled={photoLoading}>
+                  <span>
+                    {photoLoading ? <Loader2 size={16} className="mr-1 animate-spin" /> : <Camera size={16} className="mr-1" />}
+                    Foto
+                  </span>
+                </Button>
+              </label>
+              {!recording ? (
+                <Button size="sm" variant="outline" onClick={startRecording} disabled={transcribing}>
+                  {transcribing ? <Loader2 size={16} className="mr-1 animate-spin" /> : <Mic size={16} className="mr-1" />}
+                  {transcribing ? "Verwerken..." : "Spraak"}
+                </Button>
+              ) : (
+                <Button size="sm" variant="destructive" onClick={stopRecording}>
+                  <MicOff size={16} className="mr-1" /> Stop
+                </Button>
+              )}
+            </div>
             <Button size="sm" onClick={handleAiParse} disabled={aiLoading || !aiText.trim()}>
               {aiLoading ? <Loader2 size={16} className="mr-1 animate-spin" /> : <Sparkles size={16} className="mr-1" />}
               Omzetten naar taken
