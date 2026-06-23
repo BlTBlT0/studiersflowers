@@ -105,7 +105,6 @@ const Today = () => {
           size="sm"
           className="gap-2"
           onClick={handleReminderToggle}
-          disabled={typeof Notification === "undefined"}
         >
           {enabled ? <Bell size={14} /> : <BellOff size={14} />}
           {enabled ? "Aan" : "Herinneringen"}
@@ -218,9 +217,9 @@ const Today = () => {
         </div>
       )}
 
-      {permission === "denied" && (
+      {enabled && permission !== "granted" && (
         <p className="text-xs text-muted-foreground">
-          Meldingen staan uit in je browser. Sta ze toe via je browserinstellingen om herinneringen te ontvangen.
+          Browsermeldingen staan uit — je krijgt herinneringen als in-app pop-ups zolang StudyFlow open is.
         </p>
       )}
     </div>
