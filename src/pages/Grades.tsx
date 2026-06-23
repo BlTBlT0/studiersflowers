@@ -176,7 +176,23 @@ const Grades = () => {
                 {trend === "up" && <TrendingUp size={16} className="text-primary" />}
                 {trend === "down" && <TrendingDown size={16} className="text-destructive" />}
                 {trend === "neutral" && <Minus size={16} className="text-muted-foreground" />}
-                <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100" onClick={() => deleteGrade.mutate(g.id)}>
+                <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100" onClick={() => {
+                  deleteGrade.mutate(g.id);
+                  toast("Cijfer verwijderd", {
+                    description: `${g.subject} · ${g.grade}`,
+                    action: {
+                      label: "Ongedaan maken",
+                      onClick: () => addGrade.mutate({
+                        subject: g.subject,
+                        grade: g.grade,
+                        date: g.date,
+                        description: g.description ?? "",
+                        is_final_grade: g.is_final_grade,
+                      }),
+                    },
+                    duration: 6000,
+                  });
+                }}>
                   <Trash2 size={14} />
                 </Button>
               </CardContent>
