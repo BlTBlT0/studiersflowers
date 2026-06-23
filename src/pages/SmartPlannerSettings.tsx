@@ -8,14 +8,13 @@ import {
   useSubjects,
 } from "@/hooks/useSupabaseData";
 import { SUBJECTS } from "@/types";
-import { loadWeatherForecast } from "@/lib/weather";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CloudSun, GraduationCap, Plus, Save, Settings2, Trash2 } from "lucide-react";
+import { GraduationCap, Plus, Save, Settings2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 const DEFAULT_SCHOOL_END_TIMES = {
@@ -36,7 +35,6 @@ const SmartPlannerSettings = () => {
 
   const [smartEnabled, setSmartEnabled] = useState(true);
   const [gradeEnabled, setGradeEnabled] = useState(true);
-  const [weatherEnabled, setWeatherEnabled] = useState(false);
   const [weekdayStart, setWeekdayStart] = useState("16:00");
   const [weekdayEnd, setWeekdayEnd] = useState("21:30");
   const [weekendStart, setWeekendStart] = useState("10:00");
@@ -46,7 +44,6 @@ const SmartPlannerSettings = () => {
   const [maxMinutes, setMaxMinutes] = useState(90);
   const [breakMinutes, setBreakMinutes] = useState(10);
   const [outdoorPreference, setOutdoorPreference] = useState("balanced");
-  const [weatherStatus, setWeatherStatus] = useState("Nog niet gecontroleerd");
 
   const [subjectName, setSubjectName] = useState("");
   const [gradeSubject, setGradeSubject] = useState("");
@@ -59,7 +56,6 @@ const SmartPlannerSettings = () => {
     if (!settings) return;
     setSmartEnabled(settings.smart_priority_enabled);
     setGradeEnabled(settings.grade_based_planning_enabled);
-    setWeatherEnabled(settings.weather_planning_enabled);
     setWeekdayStart(settings.weekday_study_start.slice(0, 5));
     setWeekdayEnd(settings.weekday_study_end.slice(0, 5));
     setWeekendStart(settings.weekend_study_start.slice(0, 5));
@@ -90,7 +86,7 @@ const SmartPlannerSettings = () => {
       commute_minutes: settings?.commute_minutes ?? 15,
       smart_priority_enabled: smartEnabled,
       grade_based_planning_enabled: gradeEnabled,
-      weather_planning_enabled: weatherEnabled,
+      weather_planning_enabled: false,
       weekday_study_start: weekdayStart,
       weekday_study_end: weekdayEnd,
       weekend_study_start: weekendStart,
@@ -131,16 +127,6 @@ const SmartPlannerSettings = () => {
     setGradeDescription(grade.description || "");
   };
 
-  const testWeather = async () => {
-    setWeatherStatus("Locatie en weer worden opgehaald...");
-    const forecast = await loadWeatherForecast(true);
-    setWeatherStatus(
-      forecast.source === "open-meteo"
-        ? "Locatie toegestaan: echte Open-Meteo-verwachting beschikbaar"
-        : forecast.message || "Voorbeeldweer actief"
-    );
-  };
-
   if (isLoading) return <div className="py-16 text-center text-muted-foreground">Laden...</div>;
 
   return (
@@ -156,7 +142,6 @@ const SmartPlannerSettings = () => {
           {[
             ["Smart Priority", smartEnabled, setSmartEnabled],
             ["Cijfers meenemen", gradeEnabled, setGradeEnabled],
-            ["Weather Planning", weatherEnabled, setWeatherEnabled],
           ].map(([label, checked, setter]) => (
             <div key={label as string} className="flex items-center justify-between rounded-lg border p-3">
               <Label>{label as string}</Label>
@@ -190,15 +175,6 @@ const SmartPlannerSettings = () => {
             </div>
           </div>
           <Button onClick={saveSettings} className="gap-2"><Save size={16} />Instellingen opslaan</Button>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2 text-base"><CloudSun size={18} />Weer en locatie</CardTitle></CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm text-muted-foreground">{weatherStatus}</p>
-          <Button variant="outline" onClick={testWeather}>Locatie toestaan en weer testen</Button>
-          <p className="text-xs text-muted-foreground">Je exacte locatie wordt niet opgeslagen. Bij weigering gebruikt de planner voorbeeldweer.</p>
         </CardContent>
       </Card>
 
