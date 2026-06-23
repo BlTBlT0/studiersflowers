@@ -9,6 +9,7 @@ import { Search, Sparkles, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { calculatePriority, getSubjectGradeAverages } from "@/lib/smartPriority";
+import type { DbTask } from "@/hooks/useSupabaseData";
 
 const Homework = () => {
   const { data: tasks = [], isLoading } = useTasks();
@@ -31,7 +32,20 @@ const Homework = () => {
   };
 
   const handleDelete = (id: string) => {
+    const task = tasks.find((t) => t.id === id);
+    if (!task) return;
     deleteTask.mutate(id);
+    toast("Taak verwijderd", {
+      description: task.title,
+      action: {
+        label: "Ongedaan maken",
+        onClick: () => {
+          const { id: _id, user_id: _u, created_at: _c, ...rest } = task as DbTask & { user_id: string; created_at: string };
+          addTask.mutate(rest as Parameters<typeof addTask.mutate>[0]);
+        },
+      },
+      duration: 6000,
+    });
   };
 
   const handleEdit = (id: string, data: Parameters<typeof addTask.mutate>[0]) => {
