@@ -85,9 +85,8 @@ const Today = () => {
       disable();
       toast("Herinneringen uit");
     } else {
-      const ok = await enable();
-      if (ok) toast.success("Herinneringen aan — je krijgt een ping 10 min vóór elk blok");
-      else toast.error("Geef toestemming voor meldingen in je browser");
+      await enable();
+      toast.success("Herinneringen aan — je krijgt een ping 10 min vóór elk blok");
     }
   };
 
