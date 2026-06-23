@@ -41,6 +41,63 @@ export type Database = {
         }
         Relationships: []
       }
+      classmate_connections: {
+        Row: {
+          classmate_id: string
+          created_at: string
+          id: string
+          status: string
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          classmate_id: string
+          created_at?: string
+          id?: string
+          status?: string
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          classmate_id?: string
+          created_at?: string
+          id?: string
+          status?: string
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      classmate_invites: {
+        Row: {
+          code: string
+          created_at: string
+          expires_at: string
+          id: string
+          owner_id: string
+          revoked_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          code?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          owner_id: string
+          revoked_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          owner_id?: string
+          revoked_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       final_grades: {
         Row: {
           created_at: string
@@ -97,6 +154,39 @@ export type Database = {
           id?: string
           is_final_grade?: boolean
           subject?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      parent_share_tokens: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          id: string
+          label: string
+          revoked_at: string | null
+          token: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          label?: string
+          revoked_at?: string | null
+          token?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          label?: string
+          revoked_at?: string | null
+          token?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
