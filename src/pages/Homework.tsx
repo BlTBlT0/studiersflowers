@@ -1,7 +1,7 @@
 import { useTasks, useTaskMutations, usePlanBlockMutations, useGrades, useScheduleSettings } from "@/hooks/useSupabaseData";
 import { TaskForm } from "@/components/TaskForm";
 import { TaskCard } from "@/components/TaskCard";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -24,9 +24,7 @@ const Homework = () => {
   const [photoLoading, setPhotoLoading] = useState(false);
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
-  const recorderRef = useState<MediaRecorder | null>(null as MediaRecorder | null)[0] as unknown as { current: MediaRecorder | null };
-  // Use a plain object as a ref-like holder without importing useRef:
-  // (Using useState for chunks below.)
+  const recorderRef = useRef<MediaRecorder | null>(null);
 
   const handleAdd = (data: Parameters<typeof addTask.mutate>[0]) => {
     addTask.mutate(data);
@@ -202,7 +200,7 @@ const Homework = () => {
         }
       };
       rec.start();
-      (recorderRef as { current: MediaRecorder | null }).current = rec;
+      recorderRef.current = rec;
       setRecording(true);
     } catch {
       toast.error("Microfoontoegang geweigerd");
@@ -210,7 +208,7 @@ const Homework = () => {
   };
 
   const stopRecording = () => {
-    const rec = (recorderRef as { current: MediaRecorder | null }).current;
+    const rec = recorderRef.current;
     if (rec && rec.state !== "inactive") rec.stop();
   };
 
