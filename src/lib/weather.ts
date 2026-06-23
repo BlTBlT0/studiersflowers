@@ -62,6 +62,15 @@ export async function loadWeatherForecast(enabled: boolean): Promise<WeatherFore
   if (!enabled || typeof navigator === "undefined") return mockForecast();
 
   try {
+    if ("permissions" in navigator) {
+      const permission = await navigator.permissions.query({ name: "geolocation" as PermissionName });
+      if (permission.state !== "granted") {
+        return {
+          ...mockForecast(),
+          message: "Voorbeeldweer wordt gebruikt totdat locatie-toegang is toegestaan.",
+        };
+      }
+    }
     const position = await getPosition();
     const params = new URLSearchParams({
       latitude: position.coords.latitude.toString(),

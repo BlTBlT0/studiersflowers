@@ -76,12 +76,18 @@ const Planner = () => {
   };
 
   const handleGenerate = async () => {
-    const incompleteTasks = tasks.filter((t) => !t.completed);
+    const incompleteTasks = tasks.filter((task) => !task.completed);
+    const plannableTasks = incompleteTasks.filter((task) => task.smart_planning_enabled);
     if (incompleteTasks.length === 0) {
       toast.error("Geen openstaande taken om in te plannen!");
       return;
     }
+    if (plannableTasks.length === 0) {
+      toast.error("Geen taken met slim plannen aan. Zet slim plannen aan bij je taken.");
+      return;
+    }
     setGenerating(true);
+    const toastId = toast.loading("Slim plan wordt gemaakt...");
     try {
       const weather = dbSettings?.weather_planning_enabled
         ? await loadWeatherForecast(true)
@@ -98,10 +104,18 @@ const Planner = () => {
       );
       await applyTaskScores.mutateAsync(result.taskUpdates);
       await savePlan.mutateAsync(result.blocks);
+      toast.dismiss(toastId);
+      if (result.blocks.length === 0) {
+        toast.warning("Geen blokken gemaakt. Controleer je studietijden en deadlines bij Instellingen.");
+        return;
+      }
       if (result.unscheduledTaskIds.length > 0) {
         toast.warning(`${result.unscheduledTaskIds.length} taak/taken pasten niet vóór de deadline.`);
       }
       toast.success(`Slim plan gegenereerd met ${result.blocks.filter((block) => !block.is_break).length} studieblokken.`);
+    } catch (error) {
+      toast.dismiss(toastId);
+      toast.error(error instanceof Error ? error.message : "Slim plan maken mislukt");
     } finally {
       setGenerating(false);
     }
@@ -259,7 +273,7 @@ const Planner = () => {
           </Dialog>
           <Button onClick={handleGenerate} className="gap-2" disabled={generating}>
             <Wand2 size={16} />
-            {generating ? "Slim plan maken..." : "Generate Smart Plan"}
+            {generating ? "Slim plan maken..." : "Slim plan maken"}
           </Button>
         </div>
       </div>
@@ -314,7 +328,7 @@ const Planner = () => {
           <Wand2 size={40} className="mb-3 text-primary/40" />
           <h3 className="font-display text-lg font-semibold">Klaar om te plannen</h3>
           <p className="mt-1 max-w-xs text-sm text-muted-foreground">
-            Klik op "Plan genereren" om je huiswerk automatisch in te plannen in de beschikbare tijdsloten.
+            Klik op "Slim plan maken" om je huiswerk automatisch in te plannen in de beschikbare tijdsloten.
           </p>
         </div>
       )}
