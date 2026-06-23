@@ -4,7 +4,7 @@ import { generateSmartPlan, isPreservedPlanBlock, type SmartPlannerSettings } fr
 import { loadWeatherForecast } from "@/lib/weather";
 import { TimelineBlock } from "@/components/TimelineBlock";
 import { Button } from "@/components/ui/button";
-import { Wand2, CalendarDays, HeartPulse } from "lucide-react";
+import { Wand2, CalendarDays, HeartPulse, Download } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
 import { nl } from "date-fns/locale";
 import { toast } from "sonner";
+import { downloadIcs } from "@/lib/icsExport";
 import {
   DndContext,
   closestCenter,
@@ -219,6 +220,18 @@ const Planner = () => {
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="font-display text-2xl font-bold">Planner</h1>
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="gap-2"
+            disabled={planBlocks.length === 0}
+            onClick={() => {
+              downloadIcs(planBlocks);
+              toast.success("Kalender geëxporteerd. Open het bestand om te importeren in Google/Apple Agenda.");
+            }}
+          >
+            <Download size={16} />
+            Exporteer
+          </Button>
           <Dialog open={sickOpen} onOpenChange={setSickOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" className="gap-2">
