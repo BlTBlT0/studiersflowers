@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { format } from "date-fns";
 import { usePlanBlocks } from "./useSupabaseData";
+import { toast } from "sonner";
 
 const STORAGE_KEY = "studyflow.reminders.enabled";
 const FIRED_KEY = "studyflow.reminders.fired";
@@ -19,22 +20,28 @@ function setFired(map: Record<string, number>) {
 
 export function useReminders() {
   const { data: blocks = [] } = usePlanBlocks();
+  const supportsNotifications = typeof window !== "undefined" && typeof Notification !== "undefined";
   const [enabled, setEnabledState] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem(STORAGE_KEY) === "1";
   });
   const [permission, setPermission] = useState<NotificationPermission>(() =>
-    typeof Notification !== "undefined" ? Notification.permission : "default"
+    typeof Notification !== "undefined" ? Notification.permission : "denied"
   );
 
   const enable = useCallback(async () => {
-    if (typeof Notification === "undefined") return false;
-    const result = await Notification.requestPermission();
-    setPermission(result);
-    const ok = result === "granted";
-    setEnabledState(ok);
-    localStorage.setItem(STORAGE_KEY, ok ? "1" : "0");
-    return ok;
+    // Always enable in-app reminders (toasts). Try native notifications as bonus.
+    setEnabledState(true);
+    localStorage.setItem(STORAGE_KEY, "1");
+    if (typeof Notification !== "undefined") {
+      try {
+        const result = await Notification.requestPermission();
+        setPermission(result);
+      } catch {
+        // ignore
+      }
+    }
+    return true;
   }, []);
 
   const disable = useCallback(() => {
@@ -44,8 +51,8 @@ export function useReminders() {
 
   // Schedule notifications for upcoming blocks today/tomorrow
   useEffect(() => {
-    if (!enabled || permission !== "granted") return;
-    if (typeof Notification === "undefined") return;
+    if (!enabled) return;
+    const useNative = supportsNotifications && permission === "granted";
 
     const timeouts: number[] = [];
     const now = Date.now();
@@ -78,11 +85,15 @@ export function useReminders() {
         const delay = reminder.fireAt - now;
         const id = window.setTimeout(() => {
           try {
-            new Notification(reminder.title, {
-              body: reminder.body,
-              icon: "/favicon.ico",
-              tag: reminder.key,
-            });
+            if (useNative) {
+              new Notification(reminder.title, {
+                body: reminder.body,
+                icon: "/favicon.ico",
+                tag: reminder.key,
+              });
+            } else {
+              toast(reminder.title, { description: reminder.body });
+            }
             const map = getFired();
             map[reminder.key] = Date.now();
             setFired(map);
@@ -97,7 +108,7 @@ export function useReminders() {
     return () => {
       timeouts.forEach((id) => window.clearTimeout(id));
     };
-  }, [enabled, permission, blocks]);
+  }, [enabled, permission, blocks, supportsNotifications]);
 
   return { enabled, permission, enable, disable };
 }
