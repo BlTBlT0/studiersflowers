@@ -328,7 +328,7 @@ export function generateSmartPlan(
       is_locked: false,
       is_manual: false,
       smart_explanation: explanation,
-      weather_impact: selected.impact.reason ? selected.impact : null,
+      weather_impact: selected.impact.reason ? (selected.impact as unknown as TablesInsert<"plan_blocks">["weather_impact"]) : null,
     });
 
     if (selected.duration < chunk.minutes) {

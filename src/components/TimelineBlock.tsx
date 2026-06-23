@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
-import { Check, Coffee, GripVertical, MoveHorizontal, Play, Square, Lock, Unlock, Info } from "lucide-react";
+import { Check, Coffee, GripVertical, MoveHorizontal, Play, Square, Lock, Unlock, Info, Clock4, CalendarClock } from "lucide-react";
+import { addDays, format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,6 +66,27 @@ export function TimelineBlock({ block, onToggle, onMove, onTimerComplete, onLock
   const handleMove = () => {
     if (onMove) onMove(block.id, newDate, newTime);
     setMoveOpen(false);
+  };
+
+  const snoozeOneHour = () => {
+    if (!onMove) return;
+    const [h, m] = block.start_time.slice(0, 5).split(":").map(Number);
+    const total = h * 60 + m + 60;
+    if (total >= 23 * 60) {
+      // Spill to next day at same time
+      const next = format(addDays(parseISO(block.date), 1), "yyyy-MM-dd");
+      onMove(block.id, next, block.start_time.slice(0, 5));
+      return;
+    }
+    const newH = Math.floor(total / 60).toString().padStart(2, "0");
+    const newM = (total % 60).toString().padStart(2, "0");
+    onMove(block.id, block.date, `${newH}:${newM}`);
+  };
+
+  const snoozeTomorrow = () => {
+    if (!onMove) return;
+    const next = format(addDays(parseISO(block.date), 1), "yyyy-MM-dd");
+    onMove(block.id, next, block.start_time.slice(0, 5));
   };
 
   const formatElapsed = (secs: number) => {
@@ -174,6 +196,14 @@ export function TimelineBlock({ block, onToggle, onMove, onTimerComplete, onLock
                   <DialogTitle>Blok verplaatsen</DialogTitle>
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" size="sm" className="flex-1 gap-1" onClick={() => { snoozeOneHour(); setMoveOpen(false); }}>
+                      <Clock4 size={14} /> +1 uur
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" className="flex-1 gap-1" onClick={() => { snoozeTomorrow(); setMoveOpen(false); }}>
+                      <CalendarClock size={14} /> Morgen
+                    </Button>
+                  </div>
                   <div>
                     <Label>Nieuwe datum</Label>
                     <Input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} />

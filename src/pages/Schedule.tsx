@@ -8,8 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus, Trash2, Clock, Home } from "lucide-react";
 
-const DEFAULT_SCHOOL_END_TIMES = {
+const DEFAULT_SCHOOL_END_TIMES: Record<Weekday, string> = {
   monday: "15:30", tuesday: "15:30", wednesday: "15:30", thursday: "15:30", friday: "15:30",
+  saturday: "00:00", sunday: "00:00",
 };
 const SCHOOL_DAYS: Weekday[] = ["monday", "tuesday", "wednesday", "thursday", "friday"];
 

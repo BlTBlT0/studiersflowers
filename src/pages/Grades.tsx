@@ -1,4 +1,5 @@
 import { useGrades, useGradeMutations } from "@/hooks/useSupabaseData";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -11,7 +12,7 @@ import { useState } from "react";
 const Grades = () => {
   const { data: grades = [], isLoading } = useGrades(false);
   const { data: finalGrades = [], isLoading: finalLoading } = useGrades(true);
-  const { deleteGrade } = useGradeMutations();
+  const { addGrade, deleteGrade } = useGradeMutations();
   const [filterSubject, setFilterSubject] = useState<string>("all");
 
   // Compute averages per subject
@@ -175,7 +176,23 @@ const Grades = () => {
                 {trend === "up" && <TrendingUp size={16} className="text-primary" />}
                 {trend === "down" && <TrendingDown size={16} className="text-destructive" />}
                 {trend === "neutral" && <Minus size={16} className="text-muted-foreground" />}
-                <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100" onClick={() => deleteGrade.mutate(g.id)}>
+                <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100" onClick={() => {
+                  deleteGrade.mutate(g.id);
+                  toast("Cijfer verwijderd", {
+                    description: `${g.subject} · ${g.grade}`,
+                    action: {
+                      label: "Ongedaan maken",
+                      onClick: () => addGrade.mutate({
+                        subject: g.subject,
+                        grade: g.grade,
+                        date: g.date,
+                        description: g.description ?? "",
+                        is_final_grade: g.is_final_grade,
+                      }),
+                    },
+                    duration: 6000,
+                  });
+                }}>
                   <Trash2 size={14} />
                 </Button>
               </CardContent>

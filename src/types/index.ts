@@ -72,6 +72,8 @@ export const DEFAULT_SCHEDULE: ScheduleSettings = {
     wednesday: "15:30",
     thursday: "15:30",
     friday: "15:30",
+    saturday: "00:00",
+    sunday: "00:00",
   },
   bedtime: "21:30",
   commuteMinutes: 15,
