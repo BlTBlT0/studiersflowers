@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { Layout } from "@/components/Layout";
 import Index from "./pages/Index";
 import Homework from "./pages/Homework";
+import Today from "./pages/Today";
 import Schedule from "./pages/Schedule";
 import Planner from "./pages/Planner";
 import Grades from "./pages/Grades";
@@ -50,6 +51,7 @@ const App = () => (
                     <Routes>
                       <Route path="/" element={<Index />} />
                       <Route path="/homework" element={<Homework />} />
+                      <Route path="/today" element={<Today />} />
                       <Route path="/schedule" element={<Schedule />} />
                       <Route path="/planner" element={<Planner />} />
                       <Route path="/grades" element={<Grades />} />

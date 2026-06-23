@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, BookOpen, Calendar, Wand2, GraduationCap, BarChart3, CalendarDays, Download, Menu, X, LogOut, Sun, Moon, Settings2 } from "lucide-react";
+import { LayoutDashboard, BookOpen, Calendar, Wand2, GraduationCap, BarChart3, CalendarDays, Download, Menu, X, LogOut, Sun, Moon, Settings2, Target } from "lucide-react";
 import { useState } from "react";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
@@ -9,6 +9,7 @@ import logo from "@/assets/logo.png";
 
 const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
+  { to: "/today", icon: Target, label: "Vandaag" },
   { to: "/homework", icon: BookOpen, label: "Huiswerk" },
   { to: "/schedule", icon: Calendar, label: "Rooster" },
   { to: "/planner", icon: Wand2, label: "Planner" },
