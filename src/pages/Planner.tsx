@@ -4,8 +4,14 @@ import { generateSmartPlan, isPreservedPlanBlock, type SmartPlannerSettings } fr
 import { loadWeatherForecast } from "@/lib/weather";
 import { TimelineBlock } from "@/components/TimelineBlock";
 import { Button } from "@/components/ui/button";
-import { Wand2, CalendarDays } from "lucide-react";
+import { Wand2, CalendarDays, HeartPulse } from "lucide-react";
 import { format, parseISO } from "date-fns";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useQueryClient } from "@tanstack/react-query";
 import { nl } from "date-fns/locale";
 import { toast } from "sonner";
 import {
@@ -36,6 +42,10 @@ const Planner = () => {
   const { addTracking } = useTimeTrackingMutations();
   const [activeBlock, setActiveBlock] = useState<DbPlanBlock | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [sickOpen, setSickOpen] = useState(false);
+  const [sickDate, setSickDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const { user } = useAuth();
+  const qc = useQueryClient();
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -93,6 +103,45 @@ const Planner = () => {
       toast.success(`Slim plan gegenereerd met ${result.blocks.filter((block) => !block.is_break).length} studieblokken.`);
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const markSickDay = async () => {
+    if (!user) return;
+    setSickOpen(false);
+    try {
+      // 1. Remove generated (non-locked, non-manual, non-completed) blocks on that date
+      await supabase
+        .from("plan_blocks")
+        .delete()
+        .eq("user_id", user.id)
+        .eq("date", sickDate)
+        .eq("is_locked", false as never)
+        .eq("is_manual", false as never)
+        .eq("completed", false);
+
+      // 2. Insert a full-day blocker block so planner skips this date
+      await supabase.from("plan_blocks").insert({
+        user_id: user.id,
+        task_id: null,
+        task_title: "🤒 Vrije dag",
+        subject: "",
+        date: sickDate,
+        start_time: "00:00",
+        end_time: "23:59",
+        duration_minutes: 24 * 60 - 1,
+        completed: false,
+        is_break: false,
+        is_locked: true,
+        is_manual: true,
+        smart_explanation: "Vrije/ziekendag — planner slaat deze dag over.",
+        weather_impact: null,
+      } as never);
+
+      await qc.invalidateQueries({ queryKey: ["plan_blocks"] });
+      toast.success(`${format(parseISO(sickDate), "EEEE d MMMM", { locale: nl })} gemarkeerd als vrije dag. Klik op "Generate Smart Plan" om taken te herverdelen.`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Kon vrije dag niet markeren");
     }
   };
 
@@ -169,10 +218,37 @@ const Planner = () => {
     <div>
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="font-display text-2xl font-bold">Planner</h1>
-        <Button onClick={handleGenerate} className="gap-2" disabled={generating}>
-          <Wand2 size={16} />
-          {generating ? "Slim plan maken..." : "Generate Smart Plan"}
-        </Button>
+        <div className="flex gap-2">
+          <Dialog open={sickOpen} onOpenChange={setSickOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <HeartPulse size={16} />
+                Vrije dag
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-xs">
+              <DialogHeader>
+                <DialogTitle>Ziek of vrije dag</DialogTitle>
+                <DialogDescription>
+                  Markeer een dag als vrij. Bestaande studieblokken op die dag worden verwijderd en de planner slaat de dag voortaan over.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex flex-col gap-3">
+                <div>
+                  <Label>Welke dag?</Label>
+                  <Input type="date" value={sickDate} onChange={(e) => setSickDate(e.target.value)} />
+                </div>
+                <Button onClick={markSickDay} className="gap-2">
+                  <HeartPulse size={16} /> Markeer als vrije dag
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+          <Button onClick={handleGenerate} className="gap-2" disabled={generating}>
+            <Wand2 size={16} />
+            {generating ? "Slim plan maken..." : "Generate Smart Plan"}
+          </Button>
+        </div>
       </div>
 
       {dates.length > 0 ? (
