@@ -2,3 +2,12 @@ project_id = "rrlounryfmkfujjxwjqn"
 
 [functions.magister-import]
 verify_jwt = false
+
+[functions.photo-to-task]
+verify_jwt = true
+
+[functions.transcribe-audio]
+verify_jwt = true
+
+[functions.summarize-text]
+verify_jwt = true
